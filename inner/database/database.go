@@ -21,5 +21,5 @@ func ConnectDbWithCfg(cfg common.Config) *sqlx.DB {
 	db.SetMaxOpenConns(20)
 	db.SetConnMaxLifetime(1 * time.Minute)
 	db.SetConnMaxIdleTime(10 * time.Minute)
-	return DB
+	return db
 }
