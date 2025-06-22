@@ -1,0 +1,106 @@
+package tests
+
+import (
+	"idm/inner/role"
+	"testing"
+	"time"
+)
+
+func TruncateRoleTable() {
+	testDB.Exec("TRUNCATE role RESTART IDENTITY CASCADE")
+}
+
+func TestRoleRepository_AddAndFindById(t *testing.T) {
+	TruncateRoleTable()
+
+	repo := role.NewRoleRepository(testDB)
+	now := time.Now()
+	r := &role.RoleEntity{
+		Name:      "Manager",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := repo.Add(r)
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	roles, _ := repo.FindAll()
+	if len(roles) != 1 {
+		t.Fatalf("Expected 1 role, got %d", len(roles))
+	}
+
+	got, err := repo.FindById(roles[0].Id)
+	if err != nil {
+		t.Fatalf("FindById() error = %v", err)
+	}
+	if got.Name != "Manager" {
+		t.Errorf("FindById().Name = %q; want %q", got.Name, "Manager")
+	}
+}
+
+func TestRoleRepository_FindAll(t *testing.T) {
+	TruncateRoleTable()
+	repo := role.NewRoleRepository(testDB)
+	now := time.Now()
+	repo.Add(&role.RoleEntity{Name: "Dev", CreatedAt: now, UpdatedAt: now})
+	repo.Add(&role.RoleEntity{Name: "QA", CreatedAt: now, UpdatedAt: now})
+
+	all, err := repo.FindAll()
+	if err != nil {
+		t.Fatalf("FindAll() error = %v", err)
+	}
+	if len(all) != 2 {
+		t.Errorf("FindAll() len = %d; want 2", len(all))
+	}
+}
+
+func TestRoleRepository_FindByIds(t *testing.T) {
+	TruncateRoleTable()
+	repo := role.NewRoleRepository(testDB)
+	now := time.Now()
+	repo.Add(&role.RoleEntity{Name: "PM", CreatedAt: now, UpdatedAt: now})
+	repo.Add(&role.RoleEntity{Name: "Support", CreatedAt: now, UpdatedAt: now})
+	all, _ := repo.FindAll()
+	ids := []int64{all[0].Id, all[1].Id}
+
+	result, err := repo.FindByIds(ids)
+	if err != nil {
+		t.Fatalf("FindByIds() error = %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("FindByIds() len = %d; want 2", len(result))
+	}
+}
+
+func TestRoleRepository_DeleteById(t *testing.T) {
+	TruncateRoleTable()
+	repo := role.NewRoleRepository(testDB)
+	now := time.Now()
+	repo.Add(&role.RoleEntity{Name: "Temp", CreatedAt: now, UpdatedAt: now})
+	all, _ := repo.FindAll()
+	id := all[0].Id
+
+	repo.DeleteById(id)
+	remaining, _ := repo.FindAll()
+	if len(remaining) != 0 {
+		t.Errorf("After DeleteById, FindAll() len = %d; want 0", len(remaining))
+	}
+}
+
+func TestRoleRepository_DeleteByIds(t *testing.T) {
+	TruncateRoleTable()
+	repo := role.NewRoleRepository(testDB)
+	now := time.Now()
+	repo.Add(&role.RoleEntity{Name: "Intern", CreatedAt: now, UpdatedAt: now})
+	repo.Add(&role.RoleEntity{Name: "Contractor", CreatedAt: now, UpdatedAt: now})
+	all, _ := repo.FindAll()
+	ids := []int64{all[0].Id, all[1].Id}
+
+	repo.DeleteByIds(ids)
+	remaining, _ := repo.FindAll()
+	if len(remaining) != 0 {
+		t.Errorf("After DeleteByIds, FindAll() len = %d; want 0", len(remaining))
+	}
+}

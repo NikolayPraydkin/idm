@@ -20,15 +20,29 @@ type EmployeeEntity struct {
 	UpdatedAt time.Time `db:"updated_at"`
 }
 
-func (r *EmployeeRepository) FindById(id int64) (employee *EmployeeEntity, err error) {
-	err = r.db.Get(&employee, "SELECT * FROM employee WHERE id = $1", id)
-	return employee, err
+func (r *EmployeeRepository) FindById(id int64) (*EmployeeEntity, error) {
+	var entity EmployeeEntity
+	err := r.db.Get(&entity, "SELECT * FROM employee WHERE id = $1", id)
+	return &entity, err
 }
 
 func (r *EmployeeRepository) Add(employee *EmployeeEntity) error {
 	_, err := r.db.NamedExec(`INSERT INTO employee (name, created_at, updated_at) 
 		VALUES (:name, :created_at, :updated_at)`, employee)
 	return err
+}
+
+func (r *EmployeeRepository) Save(employee *EmployeeEntity) (int64, error) {
+	var id int64
+	query := `INSERT INTO employee (name, created_at, updated_at)
+			  VALUES (:name, :created_at, :updated_at)
+			  RETURNING id`
+	stmt, err := r.db.PrepareNamed(query)
+	if err != nil {
+		return 0, err
+	}
+	err = stmt.QueryRowx(employee).Scan(&id)
+	return id, err
 }
 
 func (r *EmployeeRepository) FindAll() ([]EmployeeEntity, error) {
