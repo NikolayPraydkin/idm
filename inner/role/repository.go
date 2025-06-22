@@ -26,9 +26,10 @@ func (r *RoleRepository) Add(role *RoleEntity) error {
 	return err
 }
 
-func (r *RoleRepository) FindById(id int64) (role *RoleEntity, err error) {
-	err = r.db.Get(&role, "SELECT * FROM role WHERE id = $1", id)
-	return role, err
+func (r *RoleRepository) FindById(id int64) (*RoleEntity, error) {
+	var entity RoleEntity
+	err := r.db.Get(&entity, "SELECT * FROM role WHERE id = $1", id)
+	return &entity, err
 }
 
 func (r *RoleRepository) FindAll() (roles []RoleEntity, err error) {
