@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"idm/inner/employee"
@@ -9,7 +10,10 @@ import (
 )
 
 func TruncateTable(db *sqlx.DB) {
-	db.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
+	_, err := testDB.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
+	if err != nil {
+		panic(fmt.Errorf("failed TRUNCATE role: %v", err))
+	}
 }
 
 func TestEmployeeRepository_AddAndFindById(t *testing.T) {

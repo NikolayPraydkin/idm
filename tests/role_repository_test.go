@@ -1,13 +1,17 @@
 package tests
 
 import (
+	"fmt"
 	"idm/inner/role"
 	"testing"
 	"time"
 )
 
 func TruncateRoleTable() {
-	testDB.Exec("TRUNCATE role RESTART IDENTITY CASCADE")
+	_, err := testDB.Exec("TRUNCATE role RESTART IDENTITY CASCADE")
+	if err != nil {
+		panic(fmt.Errorf("failed TRUNCATE role: %v", err))
+	}
 }
 
 func TestRoleRepository_AddAndFindById(t *testing.T) {
@@ -44,8 +48,14 @@ func TestRoleRepository_FindAll(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	repo.Add(&role.RoleEntity{Name: "Dev", CreatedAt: now, UpdatedAt: now})
-	repo.Add(&role.RoleEntity{Name: "QA", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.RoleEntity{Name: "Dev", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	err = repo.Add(&role.RoleEntity{Name: "QA", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
 
 	all, err := repo.FindAll()
 	if err != nil {
@@ -60,8 +70,14 @@ func TestRoleRepository_FindByIds(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	repo.Add(&role.RoleEntity{Name: "PM", CreatedAt: now, UpdatedAt: now})
-	repo.Add(&role.RoleEntity{Name: "Support", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.RoleEntity{Name: "PM", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	err = repo.Add(&role.RoleEntity{Name: "Support", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
 	all, _ := repo.FindAll()
 	ids := []int64{all[0].Id, all[1].Id}
 
@@ -78,11 +94,17 @@ func TestRoleRepository_DeleteById(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	repo.Add(&role.RoleEntity{Name: "Temp", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.RoleEntity{Name: "Temp", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
 	all, _ := repo.FindAll()
 	id := all[0].Id
 
-	repo.DeleteById(id)
+	err = repo.DeleteById(id)
+	if err != nil {
+		t.Fatalf("DeleteById() error = %v", err)
+	}
 	remaining, _ := repo.FindAll()
 	if len(remaining) != 0 {
 		t.Errorf("After DeleteById, FindAll() len = %d; want 0", len(remaining))
@@ -93,12 +115,21 @@ func TestRoleRepository_DeleteByIds(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	repo.Add(&role.RoleEntity{Name: "Intern", CreatedAt: now, UpdatedAt: now})
-	repo.Add(&role.RoleEntity{Name: "Contractor", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.RoleEntity{Name: "Intern", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	err = repo.Add(&role.RoleEntity{Name: "Contractor", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
 	all, _ := repo.FindAll()
 	ids := []int64{all[0].Id, all[1].Id}
 
-	repo.DeleteByIds(ids)
+	err = repo.DeleteByIds(ids)
+	if err != nil {
+		t.Fatalf("DeleteByIds() error = %v", err)
+	}
 	remaining, _ := repo.FindAll()
 	if len(remaining) != 0 {
 		t.Errorf("After DeleteByIds, FindAll() len = %d; want 0", len(remaining))
