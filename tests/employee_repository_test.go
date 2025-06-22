@@ -21,7 +21,7 @@ func TestEmployeeRepository_AddAndFindById(t *testing.T) {
 
 	repo := employee.NewEmployeeRepository(testDB)
 	now := time.Now()
-	e := &employee.EmployeeEntity{
+	e := &employee.Entity{
 		Name:      "Alice",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -46,8 +46,8 @@ func TestEmployeeRepository_FindAll(t *testing.T) {
 
 	repo := employee.NewEmployeeRepository(testDB)
 	now := time.Now()
-	_, _ = repo.Save(&employee.EmployeeEntity{Name: "Bob", CreatedAt: now, UpdatedAt: now})
-	_, _ = repo.Save(&employee.EmployeeEntity{Name: "Carol", CreatedAt: now, UpdatedAt: now})
+	_, _ = repo.Save(&employee.Entity{Name: "Bob", CreatedAt: now, UpdatedAt: now})
+	_, _ = repo.Save(&employee.Entity{Name: "Carol", CreatedAt: now, UpdatedAt: now})
 
 	all, err := repo.FindAll()
 	if err != nil {
@@ -63,8 +63,8 @@ func TestEmployeeRepository_FindByIds(t *testing.T) {
 
 	repo := employee.NewEmployeeRepository(testDB)
 	now := time.Now()
-	id1, _ := repo.Save(&employee.EmployeeEntity{Name: "Dave", CreatedAt: now, UpdatedAt: now})
-	id2, _ := repo.Save(&employee.EmployeeEntity{Name: "Eve", CreatedAt: now, UpdatedAt: now})
+	id1, _ := repo.Save(&employee.Entity{Name: "Dave", CreatedAt: now, UpdatedAt: now})
+	id2, _ := repo.Save(&employee.Entity{Name: "Eve", CreatedAt: now, UpdatedAt: now})
 
 	subset, err := repo.FindByIds([]int64{id1, id2})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestEmployeeRepository_DeleteById(t *testing.T) {
 
 	repo := employee.NewEmployeeRepository(testDB)
 	now := time.Now()
-	id, _ := repo.Save(&employee.EmployeeEntity{Name: "Frank", CreatedAt: now, UpdatedAt: now})
+	id, _ := repo.Save(&employee.Entity{Name: "Frank", CreatedAt: now, UpdatedAt: now})
 
 	if err := repo.DeleteById(id); err != nil {
 		t.Fatalf("DeleteById(%d) error = %v", id, err)
@@ -97,8 +97,8 @@ func TestEmployeeRepository_DeleteByIds(t *testing.T) {
 
 	repo := employee.NewEmployeeRepository(testDB)
 	now := time.Now()
-	id1, _ := repo.Save(&employee.EmployeeEntity{Name: "George", CreatedAt: now, UpdatedAt: now})
-	id2, _ := repo.Save(&employee.EmployeeEntity{Name: "Hannah", CreatedAt: now, UpdatedAt: now})
+	id1, _ := repo.Save(&employee.Entity{Name: "George", CreatedAt: now, UpdatedAt: now})
+	id2, _ := repo.Save(&employee.Entity{Name: "Hannah", CreatedAt: now, UpdatedAt: now})
 
 	if err := repo.DeleteByIds([]int64{id1, id2}); err != nil {
 		t.Fatalf("DeleteByIds(%v) error = %v", []int64{id1, id2}, err)

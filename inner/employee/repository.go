@@ -2,37 +2,29 @@ package employee
 
 import (
 	"github.com/jmoiron/sqlx"
-	"time"
 )
 
-type EmployeeRepository struct {
+type Repository struct {
 	db *sqlx.DB
 }
 
-func NewEmployeeRepository(database *sqlx.DB) *EmployeeRepository {
-	return &EmployeeRepository{db: database}
+func NewEmployeeRepository(database *sqlx.DB) *Repository {
+	return &Repository{db: database}
 }
 
-type EmployeeEntity struct {
-	Id        int64     `db:"id"`
-	Name      string    `db:"name"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-}
-
-func (r *EmployeeRepository) FindById(id int64) (*EmployeeEntity, error) {
-	var entity EmployeeEntity
+func (r *Repository) FindById(id int64) (*Entity, error) {
+	var entity Entity
 	err := r.db.Get(&entity, "SELECT * FROM employee WHERE id = $1", id)
 	return &entity, err
 }
 
-func (r *EmployeeRepository) Add(employee *EmployeeEntity) error {
+func (r *Repository) Add(employee *Entity) error {
 	_, err := r.db.NamedExec(`INSERT INTO employee (name, created_at, updated_at) 
 		VALUES (:name, :created_at, :updated_at)`, employee)
 	return err
 }
 
-func (r *EmployeeRepository) Save(employee *EmployeeEntity) (int64, error) {
+func (r *Repository) Save(employee *Entity) (int64, error) {
 	var id int64
 	query := `INSERT INTO employee (name, created_at, updated_at)
 			  VALUES (:name, :created_at, :updated_at)
@@ -45,29 +37,29 @@ func (r *EmployeeRepository) Save(employee *EmployeeEntity) (int64, error) {
 	return id, err
 }
 
-func (r *EmployeeRepository) FindAll() ([]EmployeeEntity, error) {
-	var employees []EmployeeEntity
+func (r *Repository) FindAll() ([]Entity, error) {
+	var employees []Entity
 	err := r.db.Select(&employees, "SELECT * FROM employee")
 	return employees, err
 }
 
-func (r *EmployeeRepository) FindByIds(ids []int64) ([]EmployeeEntity, error) {
+func (r *Repository) FindByIds(ids []int64) ([]Entity, error) {
 	query, args, err := sqlx.In("SELECT * FROM employee WHERE id IN (?)", ids)
 	if err != nil {
 		return nil, err
 	}
 	query = r.db.Rebind(query)
-	var employees []EmployeeEntity
+	var employees []Entity
 	err = r.db.Select(&employees, query, args...)
 	return employees, err
 }
 
-func (r *EmployeeRepository) DeleteById(id int64) error {
+func (r *Repository) DeleteById(id int64) error {
 	_, err := r.db.Exec("DELETE FROM employee WHERE id = $1", id)
 	return err
 }
 
-func (r *EmployeeRepository) DeleteByIds(ids []int64) error {
+func (r *Repository) DeleteByIds(ids []int64) error {
 	query, args, err := sqlx.In("DELETE FROM employee WHERE id IN (?)", ids)
 	if err != nil {
 		return err
