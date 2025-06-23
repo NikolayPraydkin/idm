@@ -9,15 +9,15 @@ import (
 var testDB *sqlx.DB
 
 type Fixture struct {
-	employees *employee.EmployeeRepository
+	employees *employee.Repository
 }
 
-func NewFixture(employees *employee.EmployeeRepository) *Fixture {
+func NewFixture(employees *employee.Repository) *Fixture {
 	return &Fixture{employees}
 }
 
 func (f *Fixture) Employee(name string) int64 {
-	var entity = employee.EmployeeEntity{
+	var entity = employee.Entity{
 		Name: name,
 	}
 	var newId, err = f.employees.Save(&entity)

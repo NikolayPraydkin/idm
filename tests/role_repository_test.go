@@ -19,7 +19,7 @@ func TestRoleRepository_AddAndFindById(t *testing.T) {
 
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	r := &role.RoleEntity{
+	r := &role.Entity{
 		Name:      "Manager",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -48,11 +48,11 @@ func TestRoleRepository_FindAll(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	err := repo.Add(&role.RoleEntity{Name: "Dev", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.Entity{Name: "Dev", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
-	err = repo.Add(&role.RoleEntity{Name: "QA", CreatedAt: now, UpdatedAt: now})
+	err = repo.Add(&role.Entity{Name: "QA", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
@@ -70,11 +70,11 @@ func TestRoleRepository_FindByIds(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	err := repo.Add(&role.RoleEntity{Name: "PM", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.Entity{Name: "PM", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
-	err = repo.Add(&role.RoleEntity{Name: "Support", CreatedAt: now, UpdatedAt: now})
+	err = repo.Add(&role.Entity{Name: "Support", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
@@ -94,7 +94,7 @@ func TestRoleRepository_DeleteById(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	err := repo.Add(&role.RoleEntity{Name: "Temp", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.Entity{Name: "Temp", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
@@ -115,11 +115,11 @@ func TestRoleRepository_DeleteByIds(t *testing.T) {
 	TruncateRoleTable()
 	repo := role.NewRoleRepository(testDB)
 	now := time.Now()
-	err := repo.Add(&role.RoleEntity{Name: "Intern", CreatedAt: now, UpdatedAt: now})
+	err := repo.Add(&role.Entity{Name: "Intern", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
-	err = repo.Add(&role.RoleEntity{Name: "Contractor", CreatedAt: now, UpdatedAt: now})
+	err = repo.Add(&role.Entity{Name: "Contractor", CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
