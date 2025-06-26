@@ -11,7 +11,7 @@ import (
 )
 
 func TruncateTable(db *sqlx.DB) {
-	_, err := testDB.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
+	_, err := db.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
 	if err != nil {
 		panic(fmt.Errorf("failed TRUNCATE role: %v", err))
 	}
@@ -139,7 +139,10 @@ func TestTransactionalCreate_SuccessAndDuplicate(t *testing.T) {
 	_, err = repo.TransactionalCreate(e2)
 	assert.Error(t, err)
 	assert.EqualError(t, err, fmt.Sprintf("employee with name %q already exists", e2.Name))
-	testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
+	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
+	if err != nil {
+		t.Logf("Get error: %v", err)
+	}
 	assert.Equal(t, 1, cnt)
 }
 
@@ -150,6 +153,9 @@ func TestTransactionalCreate_InsertErrorRollsBack(t *testing.T) {
 	_, err := repo.TransactionalCreate(e)
 	assert.Error(t, err)
 	var cnt int
-	testDB.Get(&cnt, "SELECT COUNT(1) FROM employee")
+	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee")
+	if err != nil {
+		t.Logf("Get error: %v", err)
+	}
 	assert.Equal(t, 0, cnt)
 }
