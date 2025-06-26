@@ -20,6 +20,7 @@ type Repo interface {
 	FindByIds(ids []int64) ([]Entity, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
+	TransactionalCreate(e *Entity) (int64, error)
 }
 
 // функция-конструктор
@@ -44,6 +45,11 @@ func (svc *Service) Add(req Entity) error {
 // добавление с возвратом id
 func (svc *Service) Save(req Entity) (int64, error) {
 	return svc.repo.Save(&req)
+}
+
+// транзакциооное добавление с возвратом id
+func (svc *Service) SaveWithTransaction(req Entity) (int64, error) {
+	return svc.repo.TransactionalCreate(&req)
 }
 
 // получить всех работников

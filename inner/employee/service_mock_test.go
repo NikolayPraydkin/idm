@@ -13,6 +13,15 @@ type MockRepo struct {
 	mock.Mock
 }
 
+// ErrEmployeeAlreadyExists возвращается, если работник с таким именем уже существует
+var ErrEmployeeAlreadyExists = errors.New("employee already exists")
+
+func (m *MockRepo) TransactionalCreate(e *Entity) (int64, error) {
+	args := m.Called(e)
+	// Optionally mutate e in success cases via Run in tests
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func (m *MockRepo) FindById(id int64) (*Entity, error) {
 	args := m.Called(id)
 	// Может быть nil, поэтому проверяем
@@ -163,4 +172,75 @@ func TestService_DeleteByIds(t *testing.T) {
 	err := svc.DeleteByIds(ids)
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "DeleteByIds", ids)
+}
+
+func TestService_Create(t *testing.T) {
+	base := Entity{Name: "Alice"}
+	repo := new(MockRepo)
+	svc := newTestService(repo)
+
+	tests := []struct {
+		name    string
+		setup   func()
+		wantID  int64
+		wantErr error
+	}{
+		{
+			name: "transaction begin error",
+			setup: func() {
+				repo.On("TransactionalCreate", &base).Return(int64(0), errors.New("begin failed"))
+			},
+			wantErr: errors.New("begin failed"),
+		},
+		{
+			name: "check existence error",
+			setup: func() {
+				repo.On("TransactionalCreate", &base).Return(int64(0), errors.New("check failed"))
+			},
+			wantErr: errors.New("check failed"),
+		},
+		{
+			name: "already exists",
+			setup: func() {
+				repo.On("TransactionalCreate", &base).Return(int64(0), ErrEmployeeAlreadyExists)
+			},
+			wantErr: ErrEmployeeAlreadyExists,
+		},
+		{
+			name: "insert error",
+			setup: func() {
+				repo.On("TransactionalCreate", &base).Return(int64(0), errors.New("insert failed"))
+			},
+			wantErr: errors.New("insert failed"),
+		},
+		{
+			name: "success",
+			setup: func() {
+				repo.On("TransactionalCreate", &base).
+					Run(func(args mock.Arguments) {
+						args.Get(0).(*Entity).Id = 42
+					}).
+					Return(int64(42), nil)
+			},
+			wantID: 42,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// reset mock state
+			repo.ExpectedCalls = nil
+			tc.setup()
+
+			resp, err := svc.SaveWithTransaction(base)
+			if tc.wantErr != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantID, resp)
+			}
+			repo.AssertExpectations(t)
+		})
+	}
 }

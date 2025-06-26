@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/assert"
 	"idm/inner/employee"
 	"testing"
 	"time"
@@ -107,4 +108,48 @@ func TestEmployeeRepository_DeleteByIds(t *testing.T) {
 	if len(all) != 0 {
 		t.Errorf("After DeleteByIds, FindAll() len = %d; want 0", len(all))
 	}
+}
+
+func TestTransactionalCreate_SuccessAndDuplicate(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+
+	e := &employee.Entity{
+		Name:      "Alice",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	id, err := repo.TransactionalCreate(e)
+	fmt.Printf("%v", id)
+	assert.NoError(t, err)
+	var cnt int
+	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
+	if err != nil {
+		t.Logf("duplicate insert error: %v", err)
+	}
+	assert.Equal(t, 1, cnt)
+
+	// Повторная вставка
+	e2 := &employee.Entity{
+		Name:      "Alice",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_, err = repo.TransactionalCreate(e2)
+	assert.Error(t, err)
+	assert.EqualError(t, err, fmt.Sprintf("employee with name %q already exists", e2.Name))
+	testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
+	assert.Equal(t, 1, cnt)
+}
+
+func TestTransactionalCreate_InsertErrorRollsBack(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+	e := &employee.Entity{}
+	_, err := repo.TransactionalCreate(e)
+	assert.Error(t, err)
+	var cnt int
+	testDB.Get(&cnt, "SELECT COUNT(1) FROM employee")
+	assert.Equal(t, 0, cnt)
 }

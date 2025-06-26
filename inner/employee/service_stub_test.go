@@ -9,6 +9,11 @@ import (
 // stub-репозиторий, реализующий только FindAll
 type StubRepo struct{}
 
+func (s *StubRepo) TransactionalCreate(e *Entity) (int64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (s *StubRepo) FindById(id int64) (*Entity, error) {
 	panic("not implemented")
 }
