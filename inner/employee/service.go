@@ -2,6 +2,7 @@ package employee
 
 import (
 	"fmt"
+	"github.com/jmoiron/sqlx"
 )
 
 // структура Service, которая будет инкапсулировать бизнес-логику
@@ -20,7 +21,9 @@ type Repo interface {
 	FindByIds(ids []int64) ([]Entity, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
-	TransactionalCreate(e *Entity) (int64, error)
+	BeginTransaction() (*sqlx.Tx, error)
+	FindByNameTx(tx *sqlx.Tx, name string) (bool, error)
+	SaveTx(tx *sqlx.Tx, employee Entity) (int64, error)
 }
 
 // функция-конструктор
@@ -45,11 +48,6 @@ func (svc *Service) Add(req Entity) error {
 // добавление с возвратом id
 func (svc *Service) Save(req Entity) (int64, error) {
 	return svc.repo.Save(&req)
-}
-
-// транзакциооное добавление с возвратом id
-func (svc *Service) SaveWithTransaction(req Entity) (int64, error) {
-	return svc.repo.TransactionalCreate(&req)
 }
 
 // получить всех работников
@@ -86,4 +84,47 @@ func (svc *Service) DeleteById(id int64) error {
 // удалить всех по слайсу id
 func (svc *Service) DeleteByIds(ids []int64) error {
 	return svc.repo.DeleteByIds(ids)
+}
+
+// SaveWithTransaction проверяет дубликаты и создаёт запись в рамках одной транзакции.
+func (svc *Service) SaveWithTransaction(e Entity) (int64, error) {
+	tx, err := svc.repo.BeginTransaction()
+	if err != nil {
+		return 0, fmt.Errorf("error creating transaction: %w", err)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("creating employee panic: %v", r)
+			errTx := tx.Rollback()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: rolling back transaction errors: %w, %w", err, errTx)
+			}
+		} else if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: rolling back transaction errors: %w, %w", err, errTx)
+			}
+		} else {
+			errTx := tx.Commit()
+			if errTx != nil {
+				err = fmt.Errorf("creating employee: commiting transaction error: %w", errTx)
+			}
+		}
+	}()
+	if err != nil {
+		return 0, fmt.Errorf("error create employee: error creating transaction: %w", err)
+	}
+	isExist, err := svc.repo.FindByNameTx(tx, e.Name)
+	if err != nil {
+		return 0, fmt.Errorf("error finding employee by name: %s, %w", e.Name, err)
+	}
+	if isExist {
+		err = fmt.Errorf("employee already exists")
+		return 0, err
+	}
+	newEmployeeId, err := svc.repo.SaveTx(tx, e)
+	if err != nil {
+		err = fmt.Errorf("error creating employee with name: %s %v", e.Name, err)
+	}
+	return newEmployeeId, err
 }

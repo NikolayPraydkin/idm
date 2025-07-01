@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/stretchr/testify/assert"
 	"idm/inner/employee"
 	"testing"
 	"time"
@@ -110,52 +109,91 @@ func TestEmployeeRepository_DeleteByIds(t *testing.T) {
 	}
 }
 
-func TestTransactionalCreate_SuccessAndDuplicate(t *testing.T) {
+// Test BeginTransaction and Rollback: changes should not persist after rollback
+func TestRepository_BeginTransaction_Rollback(t *testing.T) {
 	TruncateTable(testDB)
 	repo := employee.NewEmployeeRepository(testDB)
-
-	e := &employee.Entity{
-		Name:      "Alice",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	// Begin a transaction
+	tx, err := repo.BeginTransaction()
+	if err != nil {
+		t.Fatalf("BeginTransaction() error = %v", err)
 	}
-
-	id, err := repo.TransactionalCreate(e)
-	fmt.Printf("%v", id)
-	assert.NoError(t, err)
+	// Insert a record within the transaction
+	_, err = tx.Exec("INSERT INTO employee (name, created_at, updated_at) VALUES ($1, now(), now())", "Temp")
+	if err != nil {
+		t.Fatalf("tx.Exec insert error = %v", err)
+	}
+	// Rollback
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("tx.Rollback() error = %v", err)
+	}
+	// After rollback, the record should not exist
 	var cnt int
-	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
-	if err != nil {
-		t.Logf("duplicate insert error: %v", err)
+	if err := testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Temp"); err != nil {
+		t.Fatalf("Get count error = %v", err)
 	}
-	assert.Equal(t, 1, cnt)
-
-	// Повторная вставка
-	e2 := &employee.Entity{
-		Name:      "Alice",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	if cnt != 0 {
+		t.Errorf("after rollback, expected 0 rows, got %d", cnt)
 	}
-	_, err = repo.TransactionalCreate(e2)
-	assert.Error(t, err)
-	assert.EqualError(t, err, fmt.Sprintf("employee with name %q already exists", e2.Name))
-	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Alice")
-	if err != nil {
-		t.Logf("Get error: %v", err)
-	}
-	assert.Equal(t, 1, cnt)
 }
 
-func TestTransactionalCreate_InsertErrorRollsBack(t *testing.T) {
+// Test FindByNameTx within a transaction
+func TestRepository_FindByNameTx(t *testing.T) {
 	TruncateTable(testDB)
 	repo := employee.NewEmployeeRepository(testDB)
-	e := &employee.Entity{}
-	_, err := repo.TransactionalCreate(e)
-	assert.Error(t, err)
-	var cnt int
-	err = testDB.Get(&cnt, "SELECT COUNT(1) FROM employee")
+	tx, err := repo.BeginTransaction()
 	if err != nil {
-		t.Logf("Get error: %v", err)
+		t.Fatalf("BeginTransaction() error = %v", err)
 	}
-	assert.Equal(t, 0, cnt)
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	// Initially, no such name
+	exists, err := repo.FindByNameTx(tx, "Nobody")
+	if err != nil {
+		t.Fatalf("FindByNameTx() error = %v", err)
+	}
+	if exists {
+		t.Errorf("expected exists=false for name 'Nobody', got true")
+	}
+	// Insert a row within the same transaction
+	_, err = tx.Exec("INSERT INTO employee (name, created_at, updated_at) VALUES ($1, now(), now())", "Alice")
+	if err != nil {
+		t.Fatalf("tx.Exec insert error = %v", err)
+	}
+	// Now FindByNameTx should see it
+	exists, err = repo.FindByNameTx(tx, "Alice")
+	if err != nil {
+		t.Fatalf("FindByNameTx() error after insert = %v", err)
+	}
+	if !exists {
+		t.Errorf("expected exists=true for name 'Alice', got false")
+	}
+}
+
+// Test SaveTx: insert via transaction and commit persists record
+func TestRepository_SaveTx(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+	tx, err := repo.BeginTransaction()
+	if err != nil {
+		t.Fatalf("BeginTransaction() error = %v", err)
+	}
+	// Use SaveTx to insert a new entity
+	id, err := repo.SaveTx(tx, employee.Entity{Name: "Bob"})
+	if err != nil {
+		t.Fatalf("SaveTx() error = %v", err)
+	}
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("tx.Commit() error = %v", err)
+	}
+	// Verify record exists
+	var got employee.Entity
+	if err := testDB.Get(&got, "SELECT * FROM employee WHERE id = $1", id); err != nil {
+		t.Fatalf("FindById via testDB error = %v", err)
+	}
+	if got.Id != id || got.Name != "Bob" {
+		t.Errorf("expected saved entity {Id:%d Name:'Bob'}, got %+v", id, got)
+	}
 }
