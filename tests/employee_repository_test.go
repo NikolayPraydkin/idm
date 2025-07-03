@@ -10,7 +10,7 @@ import (
 )
 
 func TruncateTable(db *sqlx.DB) {
-	_, err := testDB.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
+	_, err := db.Exec("TRUNCATE employee RESTART IDENTITY CASCADE")
 	if err != nil {
 		panic(fmt.Errorf("failed TRUNCATE role: %v", err))
 	}
@@ -106,5 +106,94 @@ func TestEmployeeRepository_DeleteByIds(t *testing.T) {
 	all, _ := repo.FindAll()
 	if len(all) != 0 {
 		t.Errorf("After DeleteByIds, FindAll() len = %d; want 0", len(all))
+	}
+}
+
+// Test BeginTransaction and Rollback: changes should not persist after rollback
+func TestRepository_BeginTransaction_Rollback(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+	// Begin a transaction
+	tx, err := repo.BeginTransaction()
+	if err != nil {
+		t.Fatalf("BeginTransaction() error = %v", err)
+	}
+	// Insert a record within the transaction
+	_, err = tx.Exec("INSERT INTO employee (name, created_at, updated_at) VALUES ($1, now(), now())", "Temp")
+	if err != nil {
+		t.Fatalf("tx.Exec insert error = %v", err)
+	}
+	// Rollback
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("tx.Rollback() error = %v", err)
+	}
+	// After rollback, the record should not exist
+	var cnt int
+	if err := testDB.Get(&cnt, "SELECT COUNT(1) FROM employee WHERE name = $1", "Temp"); err != nil {
+		t.Fatalf("Get count error = %v", err)
+	}
+	if cnt != 0 {
+		t.Errorf("after rollback, expected 0 rows, got %d", cnt)
+	}
+}
+
+// Test FindByNameTx within a transaction
+func TestRepository_FindByNameTx(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+	tx, err := repo.BeginTransaction()
+	if err != nil {
+		t.Fatalf("BeginTransaction() error = %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	// Initially, no such name
+	exists, err := repo.FindByNameTx(tx, "Nobody")
+	if err != nil {
+		t.Fatalf("FindByNameTx() error = %v", err)
+	}
+	if exists {
+		t.Errorf("expected exists=false for name 'Nobody', got true")
+	}
+	// Insert a row within the same transaction
+	_, err = tx.Exec("INSERT INTO employee (name, created_at, updated_at) VALUES ($1, now(), now())", "Alice")
+	if err != nil {
+		t.Fatalf("tx.Exec insert error = %v", err)
+	}
+	// Now FindByNameTx should see it
+	exists, err = repo.FindByNameTx(tx, "Alice")
+	if err != nil {
+		t.Fatalf("FindByNameTx() error after insert = %v", err)
+	}
+	if !exists {
+		t.Errorf("expected exists=true for name 'Alice', got false")
+	}
+}
+
+// Test SaveTx: insert via transaction and commit persists record
+func TestRepository_SaveTx(t *testing.T) {
+	TruncateTable(testDB)
+	repo := employee.NewEmployeeRepository(testDB)
+	tx, err := repo.BeginTransaction()
+	if err != nil {
+		t.Fatalf("BeginTransaction() error = %v", err)
+	}
+	// Use SaveTx to insert a new entity
+	id, err := repo.SaveTx(tx, employee.Entity{Name: "Bob"})
+	if err != nil {
+		t.Fatalf("SaveTx() error = %v", err)
+	}
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("tx.Commit() error = %v", err)
+	}
+	// Verify record exists
+	var got employee.Entity
+	if err := testDB.Get(&got, "SELECT * FROM employee WHERE id = $1", id); err != nil {
+		t.Fatalf("FindById via testDB error = %v", err)
+	}
+	if got.Id != id || got.Name != "Bob" {
+		t.Errorf("expected saved entity {Id:%d Name:'Bob'}, got %+v", id, got)
 	}
 }

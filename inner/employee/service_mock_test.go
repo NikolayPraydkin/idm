@@ -2,8 +2,12 @@ package employee
 
 import (
 	"errors"
+	"fmt"
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -11,6 +15,30 @@ import (
 // --- 1. Определяем мок-репозиторий ---
 type MockRepo struct {
 	mock.Mock
+}
+
+func (m *MockRepo) BeginTransaction() (*sqlx.Tx, error) {
+	args := m.Called()
+	return args.Get(0).(*sqlx.Tx), args.Error(1)
+}
+
+func (m *MockRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	args := m.Called(tx, name)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockRepo) SaveTx(tx *sqlx.Tx, employee Entity) (int64, error) {
+	args := m.Called(tx, employee)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+// ErrEmployeeAlreadyExists возвращается, если работник с таким именем уже существует
+var ErrEmployeeAlreadyExists = fmt.Errorf("employee already exists")
+
+func (m *MockRepo) TransactionalCreate(e *Entity) (int64, error) {
+	args := m.Called(e)
+	// Optionally mutate e in success cases via Run in tests
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func (m *MockRepo) FindById(id int64) (*Entity, error) {
@@ -163,4 +191,132 @@ func TestService_DeleteByIds(t *testing.T) {
 	err := svc.DeleteByIds(ids)
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "DeleteByIds", ids)
+}
+
+func TestService_SaveWithTransaction(t *testing.T) {
+	type testCase struct {
+		name   string
+		setup  func()
+		verify func(*testing.T)
+	}
+
+	tests := []testCase{
+		{
+			name: "begin transaction error",
+			setup: func() {
+			},
+			verify: func(t *testing.T) {
+			},
+		},
+		{
+			name: "check existence error",
+			setup: func() {
+			},
+			verify: func(t *testing.T) {
+			},
+		},
+		{
+			name: "duplicate employee",
+			setup: func() {
+			},
+			verify: func(t *testing.T) {
+			},
+		},
+		{
+			name: "insert error",
+			setup: func() {
+			},
+			verify: func(t *testing.T) {
+			},
+		},
+		{
+			name: "success creation",
+			setup: func() {
+			},
+			verify: func(t *testing.T) {
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// create fresh mock for this subtest
+			dbMock, mock, err := sqlmock.New()
+			assert.NoError(t, err)
+			defer dbMock.Close()
+
+			// wrap sql.DB into sqlx.DB and create new svc
+			db := sqlx.NewDb(dbMock, "sqlmock")
+			repo := NewEmployeeRepository(db)
+			svc := NewService(repo)
+
+			// common entity
+			entity := Entity{Name: "Alice"}
+
+			// redefine setup and verify closures to capture mock, svc, and entity
+			tc.setup = func() {
+				switch tc.name {
+				case "begin transaction error":
+					mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
+				case "check existence error":
+					mock.ExpectBegin()
+					mock.ExpectQuery(regexp.QuoteMeta("select exists(select 1 from employee where name = $1)")).
+						WithArgs(entity.Name).
+						WillReturnError(errors.New("select failed"))
+					mock.ExpectRollback()
+				case "duplicate employee":
+					mock.ExpectBegin()
+					mock.ExpectQuery(regexp.QuoteMeta("select exists(select 1 from employee where name = $1)")).
+						WithArgs(entity.Name).
+						WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+					mock.ExpectRollback()
+				case "insert error":
+					mock.ExpectBegin()
+					mock.ExpectQuery(regexp.QuoteMeta("select exists(select 1 from employee where name = $1)")).
+						WithArgs(entity.Name).
+						WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+					mock.ExpectQuery(regexp.QuoteMeta("insert into employee (name) values ($1) returning id")).
+						WithArgs(entity.Name).
+						WillReturnError(errors.New("insert failed"))
+					mock.ExpectRollback()
+				case "success creation":
+					mock.ExpectBegin()
+					mock.ExpectQuery(regexp.QuoteMeta("select exists(select 1 from employee where name = $1)")).
+						WithArgs(entity.Name).
+						WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+					mock.ExpectQuery(regexp.QuoteMeta("insert into employee (name) values ($1) returning id")).
+						WithArgs(entity.Name).
+						WillReturnRows(sqlmock.NewRows([]string{"employeeid"}).AddRow(123))
+					mock.ExpectCommit()
+				}
+			}
+
+			tc.verify = func(t *testing.T) {
+				id, err := svc.SaveWithTransaction(entity)
+				switch tc.name {
+				case "begin transaction error":
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "error creating transaction")
+				case "check existence error":
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "error finding employee by name")
+				case "duplicate employee":
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), ErrEmployeeAlreadyExists.Error())
+				case "insert error":
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "error creating employee with name")
+				case "success creation":
+					assert.NoError(t, err)
+					assert.Equal(t, int64(123), id)
+				}
+			}
+
+			tc.setup()
+			tc.verify(t)
+
+			// ensure expectations were met
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }

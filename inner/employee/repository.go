@@ -68,3 +68,25 @@ func (r *Repository) DeleteByIds(ids []int64) error {
 	_, err = r.db.Exec(query, args...)
 	return err
 }
+
+func (r *Repository) BeginTransaction() (tx *sqlx.Tx, err error) {
+	return r.db.Beginx()
+}
+
+func (r *Repository) FindByNameTx(tx *sqlx.Tx, name string) (isExists bool, err error) {
+	err = tx.Get(
+		&isExists,
+		"select exists(select 1 from employee where name = $1)",
+		name,
+	)
+	return isExists, err
+}
+
+func (r *Repository) SaveTx(tx *sqlx.Tx, employee Entity) (employeeId int64, err error) {
+	err = tx.Get(
+		&employeeId,
+		`insert into employee (name) values ($1) returning id`,
+		employee.Name,
+	)
+	return employeeId, err
+}

@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -8,6 +9,18 @@ import (
 
 // stub-репозиторий, реализующий только FindAll
 type StubRepo struct{}
+
+func (s *StubRepo) BeginTransaction() (*sqlx.Tx, error) {
+	panic("implement me")
+}
+
+func (s *StubRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
+	panic("implement me")
+}
+
+func (s *StubRepo) SaveTx(tx *sqlx.Tx, employee Entity) (int64, error) {
+	panic("implement me")
+}
 
 func (s *StubRepo) FindById(id int64) (*Entity, error) {
 	panic("not implemented")
