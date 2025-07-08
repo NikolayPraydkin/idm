@@ -24,3 +24,11 @@ type Response struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type CreateRequest struct {
+	Name string `json:"name" validate:"required,min=2,max=155"`
+}
+
+func (req *CreateRequest) ToEntity() Entity {
+	return Entity{Name: req.Name}
+}
