@@ -4,8 +4,9 @@ import "github.com/gofiber/fiber/v2"
 
 // структуа веб-сервера
 type Server struct {
-	App        *fiber.App
-	GroupApiV1 fiber.Router
+	App           *fiber.App
+	GroupApiV1    fiber.Router
+	GroupInternal fiber.Router
 }
 
 // функция-конструктор
