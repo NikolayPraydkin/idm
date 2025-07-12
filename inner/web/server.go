@@ -20,8 +20,11 @@ func NewServer() *Server {
 
 	// создаём подгруппу "api/v1"
 	groupApiV1 := groupApi.Group("/v1")
+
+	groupInternal := groupApi.Group("/internal")
 	return &Server{
-		App:        app,
-		GroupApiV1: groupApiV1,
+		App:           app,
+		GroupApiV1:    groupApiV1,
+		GroupInternal: groupInternal,
 	}
 }

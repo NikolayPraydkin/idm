@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"idm/inner/common"
+	"idm/inner/info"
+
 	//"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -29,7 +32,7 @@ func main() {
 // buil функция, конструирующая наш веб-сервер
 func build(database *sqlx.DB) *web.Server {
 	// читаем конфиги
-	//var cfg = common.GetConfig(".env")
+	var cfg = common.GetConfig(".env")
 	// создаём веб-сервер
 	var server = web.NewServer()
 	// создаём репозиторий
@@ -40,7 +43,7 @@ func build(database *sqlx.DB) *web.Server {
 	var employeeController = employee.NewController(server, employeeService)
 	employeeController.RegisterRoutes()
 	// ещё один контроллер
-	//var infoController = info.NewController(server, cfg)
-	//infoController.RegisterRoutes()
+	var infoController = info.NewController(server, cfg)
+	infoController.RegisterRoutes()
 	return server
 }
