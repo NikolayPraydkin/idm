@@ -31,6 +31,7 @@ func NewController(server *web.Server, employeeService Svc) *Controller {
 	return &Controller{
 		server:          server,
 		employeeService: employeeService,
+		validator:       *validator.New(),
 	}
 }
 
