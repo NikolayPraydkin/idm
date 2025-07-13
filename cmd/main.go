@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"idm/inner/common"
-	"idm/inner/info"
-
-	//"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
-	//"idm/inner/info"
+	"idm/inner/info"
 	"idm/inner/web"
 )
 
