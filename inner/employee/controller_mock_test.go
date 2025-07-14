@@ -74,7 +74,8 @@ func TestCreateEmployee(t *testing.T) {
 		// Готовим тестовое окружение
 		server := web.NewServer()
 		var svc = new(MockService)
-		var controller = NewController(server, svc)
+		var logger = common.NewLogger(common.GetConfig(".env"))
+		var controller = NewController(server, svc, logger)
 		controller.RegisterRoutes()
 		// Готовим тестовое окружение
 		var body = strings.NewReader("{\"name\": \"john doe\"}")
@@ -108,7 +109,7 @@ func TestAddEmployee(t *testing.T) {
 	t.Run("should add employee successfully", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		body := strings.NewReader(`{"name":"alice"}`)
@@ -131,7 +132,7 @@ func TestAddEmployee(t *testing.T) {
 	t.Run("should return bad request on validation error", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", strings.NewReader(`{}`))
@@ -144,7 +145,7 @@ func TestAddEmployee(t *testing.T) {
 	t.Run("should return internal error on service failure", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		body := strings.NewReader(`{"name":"alice"}`)
@@ -165,7 +166,7 @@ func TestSaveEmployee(t *testing.T) {
 	t.Run("should save employee and return id", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		body := strings.NewReader(`{"name":"bob"}`)
@@ -188,7 +189,7 @@ func TestSaveEmployee(t *testing.T) {
 	t.Run("should return bad request on validation error", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", strings.NewReader(`{}`))
@@ -201,7 +202,7 @@ func TestSaveEmployee(t *testing.T) {
 	t.Run("should return internal error on service failure", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		body := strings.NewReader(`{"name":"bob"}`)
@@ -222,7 +223,7 @@ func TestGetEmployee(t *testing.T) {
 	t.Run("should return employee", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		svc.On("FindById", int64(7)).Return(Response{Id: 7, Name: "E"}, nil)
@@ -242,7 +243,7 @@ func TestGetEmployee(t *testing.T) {
 	t.Run("should return bad request on invalid id", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		req := httptest.NewRequest(fiber.MethodGet, "/api/v1/employees/abc", nil)
@@ -254,7 +255,7 @@ func TestGetEmployee(t *testing.T) {
 	t.Run("should return internal error on service failure", func(t *testing.T) {
 		server := web.NewServer()
 		svc := new(MockService)
-		controller := NewController(server, svc)
+		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
 		svc.On("FindById", int64(8)).Return(Response{}, errors.New("fail"))
