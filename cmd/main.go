@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"go.uber.org/zap"
 	"idm/inner/common"
 	"idm/inner/database"
 	"idm/inner/employee"
@@ -16,11 +16,13 @@ import (
 
 func main() {
 	var server = build()
+	var cfg = common.GetConfig(".env")
+	var logger = common.NewLogger(cfg)
 	// Запускаем сервер в отдельной горутине
 	go func() {
 		var err = server.App.Listen(":8080")
 		if err != nil {
-			panic(fmt.Sprintf("http server error: %s", err))
+			logger.Panic("http server error: %s", zap.Error(err))
 		}
 	}()
 
@@ -28,14 +30,14 @@ func main() {
 	var wg = &sync.WaitGroup{}
 	wg.Add(1)
 	// Запускаем gracefulShutdown в отдельной горутине
-	go gracefulShutdown(server, wg)
+	go gracefulShutdown(server, wg, logger)
 	// Ожидаем сигнал от горутины gracefulShutdown, что сервер завершил работу
 	wg.Wait()
-	fmt.Println("Graceful shutdown complete.")
+	logger.Sugar().Info("Graceful shutdown complete.")
 }
 
 // Функция "элегантного" завершения работы сервера по сигналу от операционной системы
-func gracefulShutdown(server *web.Server, wg *sync.WaitGroup) {
+func gracefulShutdown(server *web.Server, wg *sync.WaitGroup, logger *common.Logger) {
 	// Уведомить основную горутину о завершении работы
 	defer wg.Done()
 	// Создаём контекст, который слушает сигналы прерывания от операционной системы
@@ -43,15 +45,15 @@ func gracefulShutdown(server *web.Server, wg *sync.WaitGroup) {
 	defer stop()
 	// Слушаем сигнал прерывания от операционной системы
 	<-ctx.Done()
-	fmt.Println("shutting down gracefully, press Ctrl+C again to force")
+	logger.Sugar().Info("shutting down gracefully, press Ctrl+C again to force")
 	// Контекст используется для информирования веб-сервера о том,
 	// что у него есть 5 секунд на выполнение запроса, который он обрабатывает в данный момент
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.App.ShutdownWithContext(ctx); err != nil {
-		fmt.Printf("Server forced to shutdown with error: %v\n", err)
+		logger.Sugar().Error("Server forced to shutdown with error:", zap.Error(err))
 	}
-	fmt.Println("Server exiting")
+	logger.Sugar().Info("Server exiting")
 }
 
 func build() *web.Server {
@@ -61,7 +63,10 @@ func build() *web.Server {
 
 	var employeeRepo = employee.NewEmployeeRepository(dataBase)
 	var employeeService = employee.NewService(employeeRepo)
-	var employeeController = employee.NewController(server, employeeService)
+	//создаём логгер
+	var logger = common.NewLogger(cfg)
+	// создаём контроллер
+	var employeeController = employee.NewController(server, employeeService, logger)
 	employeeController.RegisterRoutes()
 
 	var infoController = info.NewController(server, cfg)
