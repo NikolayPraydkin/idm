@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"idm/inner/common"
 	"regexp"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func (m *MockRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockRepo) SaveTx(tx *sqlx.Tx, employee Entity) (int64, error) {
+func (m *MockRepo) SaveTx(tx *sqlx.Tx, employee *Entity) (int64, error) {
 	args := m.Called(tx, employee)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -113,26 +114,50 @@ func TestService_FindById(t *testing.T) {
 func TestService_Add(t *testing.T) {
 	repo := new(MockRepo)
 	svc := newTestService(repo)
+	req := CreateRequest{Name: "Jane"}
+	repo.On("Add", req.ToEntity()).Return(nil)
 
-	ent := Entity{Id: 0, Name: "Jane"}
-	repo.On("Add", &ent).Return(nil)
-
-	err := svc.Add(ent)
+	err := svc.Add(req)
 	assert.NoError(t, err)
-	repo.AssertCalled(t, "Add", &ent)
+	repo.AssertCalled(t, "Add", req.ToEntity())
+
+	// Validation error for empty name in Add
+	t.Run("should return validation error on Add with empty name", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := newTestService(repo)
+		req := CreateRequest{Name: ""}
+		err := svc.Add(req)
+		assert.Error(t, err)
+		var valErr common.RequestValidationError
+		assert.True(t, errors.As(err, &valErr))
+		repo.AssertNotCalled(t, "Add", mock.Anything)
+	})
 }
 
 func TestService_Save(t *testing.T) {
 	repo := new(MockRepo)
 	svc := newTestService(repo)
 
-	ent := Entity{Id: 0, Name: "Bob"}
-	repo.On("Save", &ent).Return(int64(42), nil)
+	ent := CreateRequest{Name: "Bob"}
+	repo.On("Save", ent.ToEntity()).Return(int64(42), nil)
 
 	id, err := svc.Save(ent)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(42), id)
-	repo.AssertCalled(t, "Save", &ent)
+	repo.AssertCalled(t, "Save", ent.ToEntity())
+
+	// Validation error for empty name in Save
+	t.Run("should return validation error on Save with empty name", func(t *testing.T) {
+		repo := new(MockRepo)
+		svc := newTestService(repo)
+		req := CreateRequest{Name: ""}
+		id, err := svc.Save(req)
+		assert.Error(t, err)
+		var valErr common.RequestValidationError
+		assert.True(t, errors.As(err, &valErr))
+		assert.Equal(t, int64(0), id)
+		repo.AssertNotCalled(t, "Save", mock.Anything)
+	})
 }
 
 func TestService_FindAll(t *testing.T) {
@@ -251,7 +276,7 @@ func TestService_SaveWithTransaction(t *testing.T) {
 			svc := NewService(repo)
 
 			// common entity
-			entity := Entity{Name: "Alice"}
+			entity := CreateRequest{Name: "Alice"}
 
 			// redefine setup and verify closures to capture mock, svc, and entity
 			tc.setup = func() {
@@ -302,7 +327,7 @@ func TestService_SaveWithTransaction(t *testing.T) {
 					assert.Contains(t, err.Error(), "error finding employee by name")
 				case "duplicate employee":
 					assert.Error(t, err)
-					assert.Contains(t, err.Error(), ErrEmployeeAlreadyExists.Error())
+					assert.Contains(t, err.Error(), "employee already exists")
 				case "insert error":
 					assert.Error(t, err)
 					assert.Contains(t, err.Error(), "error creating employee with name")

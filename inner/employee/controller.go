@@ -5,7 +5,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 	"idm/inner/common"
-	"idm/inner/validator"
 	"idm/inner/web"
 	"strconv"
 )
@@ -13,27 +12,25 @@ import (
 type Controller struct {
 	server          *web.Server
 	employeeService Svc
-	validator       validator.Validator
 	logger          *common.Logger
 }
 
 // Svc описывает набор методов бизнес-логики по работе с сотрудниками
 type Svc interface {
 	FindById(id int64) (Response, error)
-	Add(req Entity) error
-	Save(req Entity) (int64, error)
+	Add(req CreateRequest) error
+	Save(req CreateRequest) (int64, error)
 	FindAll() ([]Response, error)
 	FindByIds(ids []int64) ([]Response, error)
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
-	SaveWithTransaction(e Entity) (int64, error)
+	SaveWithTransaction(e CreateRequest) (int64, error)
 }
 
 func NewController(server *web.Server, employeeService Svc, logger *common.Logger) *Controller {
 	return &Controller{
 		server:          server,
 		employeeService: employeeService,
-		validator:       *validator.New(),
 		logger:          logger,
 	}
 }
@@ -60,14 +57,8 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 	}
 	c.logger.Debug("create employee: received request", zap.Any("request", request))
 
-	// validate request struct
-	if err := c.validator.Validate(request); err != nil {
-		c.logger.Error("create employee", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	}
-
 	// вызываем метод CreateEmployee сервиса employee.Service
-	var newEmployeeId, err = c.employeeService.SaveWithTransaction(request.ToEntity())
+	var newEmployeeId, err = c.employeeService.SaveWithTransaction(request)
 	if err != nil {
 		switch {
 		// если сервис возвращает ошибку RequestValidationError или AlreadyExistsError,
@@ -101,13 +92,15 @@ func (c *Controller) AddEmployee(ctx *fiber.Ctx) error {
 	}
 	c.logger.Debug("Add employee: received request", zap.Any("request", req))
 
-	if err := c.validator.Validate(req); err != nil {
-		c.logger.Error("Add employee", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	}
-	if err := c.employeeService.Add(req.ToEntity()); err != nil {
-		c.logger.Error("Add employee", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	if err := c.employeeService.Add(req); err != nil {
+		switch {
+		case errors.As(err, &common.RequestValidationError{}) || errors.As(err, &common.AlreadyExistsError{}):
+			c.logger.Error("Add employee", zap.Error(err))
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		default:
+			c.logger.Error("Add employee", zap.Error(err))
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+		}
 	}
 	return common.OkResponse(ctx, fiber.Map{"message": "added"})
 }
@@ -121,15 +114,16 @@ func (c *Controller) SaveEmployee(ctx *fiber.Ctx) error {
 	}
 	c.logger.Debug("Save employee: received request", zap.Any("request", req))
 
-	if err := c.validator.Validate(req); err != nil {
-		c.logger.Error("Save employee", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
-	}
-
-	id, err := c.employeeService.Save(req.ToEntity())
+	id, err := c.employeeService.Save(req)
 	if err != nil {
-		c.logger.Error("Save employee", zap.Error(err))
-		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+		switch {
+		case errors.As(err, &common.RequestValidationError{}) || errors.As(err, &common.AlreadyExistsError{}):
+			c.logger.Error("Save employee", zap.Error(err))
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		default:
+			c.logger.Error("Save employee", zap.Error(err))
+			return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+		}
 	}
 	return common.OkResponse(ctx, fiber.Map{"id": id})
 }

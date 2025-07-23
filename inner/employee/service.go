@@ -3,11 +3,14 @@ package employee
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"idm/inner/common"
+	"idm/inner/validator"
 )
 
 // структура Service, которая будет инкапсулировать бизнес-логику
 type Service struct {
-	repo Repo
+	repo      Repo
+	validator *validator.Validator
 }
 
 // интерфейс репозитория
@@ -23,12 +26,12 @@ type Repo interface {
 	DeleteByIds(ids []int64) error
 	BeginTransaction() (*sqlx.Tx, error)
 	FindByNameTx(tx *sqlx.Tx, name string) (bool, error)
-	SaveTx(tx *sqlx.Tx, employee Entity) (int64, error)
+	SaveTx(tx *sqlx.Tx, employee *Entity) (int64, error)
 }
 
 // функция-конструктор
 func NewService(repo Repo) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, validator: validator.New()}
 }
 
 // бизнес-логика получения одного работника по id
@@ -41,13 +44,19 @@ func (svc *Service) FindById(id int64) (Response, error) {
 }
 
 // добавление работника без возврата id
-func (svc *Service) Add(req Entity) error {
-	return svc.repo.Add(&req)
+func (svc *Service) Add(req CreateRequest) error {
+	if err := svc.validator.Validate(req); err != nil {
+		return common.RequestValidationError{Message: err.Error()}
+	}
+	return svc.repo.Add(req.ToEntity())
 }
 
 // добавление с возвратом id
-func (svc *Service) Save(req Entity) (int64, error) {
-	return svc.repo.Save(&req)
+func (svc *Service) Save(req CreateRequest) (int64, error) {
+	if err := svc.validator.Validate(req); err != nil {
+		return 0, common.RequestValidationError{Message: err.Error()}
+	}
+	return svc.repo.Save(req.ToEntity())
 }
 
 // получить всех работников
@@ -87,7 +96,11 @@ func (svc *Service) DeleteByIds(ids []int64) error {
 }
 
 // SaveWithTransaction проверяет дубликаты и создаёт запись в рамках одной транзакции.
-func (svc *Service) SaveWithTransaction(e Entity) (int64, error) {
+func (svc *Service) SaveWithTransaction(e CreateRequest) (int64, error) {
+
+	if err := svc.validator.Validate(e); err != nil {
+		return 0, common.RequestValidationError{Message: err.Error()}
+	}
 	tx, err := svc.repo.BeginTransaction()
 	if err != nil {
 		return 0, fmt.Errorf("error creating transaction: %w", err)
@@ -119,10 +132,10 @@ func (svc *Service) SaveWithTransaction(e Entity) (int64, error) {
 		return 0, fmt.Errorf("error finding employee by name: %s, %w", e.Name, err)
 	}
 	if isExist {
-		err = fmt.Errorf("employee already exists")
+		err = common.AlreadyExistsError{Message: "employee already exists"}
 		return 0, err
 	}
-	newEmployeeId, err := svc.repo.SaveTx(tx, e)
+	newEmployeeId, err := svc.repo.SaveTx(tx, e.ToEntity())
 	if err != nil {
 		err = fmt.Errorf("error creating employee with name: %s %v", e.Name, err)
 	}

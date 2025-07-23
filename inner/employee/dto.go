@@ -29,6 +29,6 @@ type CreateRequest struct {
 	Name string `json:"name" validate:"required,min=2,max=155"`
 }
 
-func (req *CreateRequest) ToEntity() Entity {
-	return Entity{Name: req.Name}
+func (req *CreateRequest) ToEntity() *Entity {
+	return &Entity{Name: req.Name}
 }
