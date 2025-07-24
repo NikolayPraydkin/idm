@@ -180,7 +180,7 @@ func TestRepository_SaveTx(t *testing.T) {
 		t.Fatalf("BeginTransaction() error = %v", err)
 	}
 	// Use SaveTx to insert a new entity
-	id, err := repo.SaveTx(tx, employee.Entity{Name: "Bob"})
+	id, err := repo.SaveTx(tx, &employee.Entity{Name: "Bob"})
 	if err != nil {
 		t.Fatalf("SaveTx() error = %v", err)
 	}

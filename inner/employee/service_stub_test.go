@@ -18,7 +18,7 @@ func (s *StubRepo) FindByNameTx(tx *sqlx.Tx, name string) (bool, error) {
 	panic("implement me")
 }
 
-func (s *StubRepo) SaveTx(tx *sqlx.Tx, employee Entity) (int64, error) {
+func (s *StubRepo) SaveTx(tx *sqlx.Tx, employee *Entity) (int64, error) {
 	panic("implement me")
 }
 

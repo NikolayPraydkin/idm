@@ -82,7 +82,7 @@ func (r *Repository) FindByNameTx(tx *sqlx.Tx, name string) (isExists bool, err 
 	return isExists, err
 }
 
-func (r *Repository) SaveTx(tx *sqlx.Tx, employee Entity) (employeeId int64, err error) {
+func (r *Repository) SaveTx(tx *sqlx.Tx, employee *Entity) (employeeId int64, err error) {
 	err = tx.Get(
 		&employeeId,
 		`insert into employee (name) values ($1) returning id`,

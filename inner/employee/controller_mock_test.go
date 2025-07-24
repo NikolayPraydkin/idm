@@ -20,12 +20,12 @@ type MockService struct {
 	mock.Mock
 }
 
-func (svc *MockService) Add(req Entity) error {
+func (svc *MockService) Add(req CreateRequest) error {
 	args := svc.Called(req)
 	return args.Error(0)
 }
 
-func (svc *MockService) Save(req Entity) (int64, error) {
+func (svc *MockService) Save(req CreateRequest) (int64, error) {
 	args := svc.Called(req)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -50,8 +50,8 @@ func (svc *MockService) DeleteByIds(ids []int64) error {
 	return args.Error(0)
 }
 
-func (svc *MockService) SaveWithTransaction(e Entity) (int64, error) {
-	args := svc.Called(e)
+func (svc *MockService) SaveWithTransaction(e CreateRequest) (int64, error) {
+	args := svc.Called(e.ToEntity())
 	return args.Get(0).(int64), args.Error(1)
 }
 
@@ -83,7 +83,7 @@ func TestCreateEmployee(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		// Настраиваем поведение мока в тесте
-		svc.On("SaveWithTransaction", mock.AnythingOfType("employee.Entity")).Return(int64(123), nil)
+		svc.On("SaveWithTransaction", mock.AnythingOfType("*employee.Entity")).Return(int64(123), nil)
 
 		// Отправляем тестовый запрос на веб сервер
 		resp, err := server.App.Test(req)
@@ -116,7 +116,7 @@ func TestAddEmployee(t *testing.T) {
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", body)
 		req.Header.Set("Content-Type", "application/json")
 
-		svc.On("Add", mock.AnythingOfType("employee.Entity")).Return(nil)
+		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(nil)
 
 		resp, err := server.App.Test(req)
 		a.NoError(err)
@@ -135,6 +135,8 @@ func TestAddEmployee(t *testing.T) {
 		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
+		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(common.RequestValidationError{Message: "Add emploee"})
+
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := server.App.Test(req)
@@ -152,7 +154,7 @@ func TestAddEmployee(t *testing.T) {
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", body)
 		req.Header.Set("Content-Type", "application/json")
 
-		svc.On("Add", mock.AnythingOfType("employee.Entity")).Return(errors.New("fail"))
+		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(errors.New("fail"))
 
 		resp, err := server.App.Test(req)
 		a.NoError(err)
@@ -173,7 +175,7 @@ func TestSaveEmployee(t *testing.T) {
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", body)
 		req.Header.Set("Content-Type", "application/json")
 
-		svc.On("Save", mock.AnythingOfType("employee.Entity")).Return(int64(42), nil)
+		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(42), nil)
 
 		resp, err := server.App.Test(req)
 		a.NoError(err)
@@ -192,6 +194,8 @@ func TestSaveEmployee(t *testing.T) {
 		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
 		controller.RegisterRoutes()
 
+		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), common.RequestValidationError{Message: "Save employee"})
+
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := server.App.Test(req)
@@ -209,7 +213,7 @@ func TestSaveEmployee(t *testing.T) {
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", body)
 		req.Header.Set("Content-Type", "application/json")
 
-		svc.On("Save", mock.AnythingOfType("employee.Entity")).Return(int64(0), errors.New("fail"))
+		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), errors.New("fail"))
 
 		resp, err := server.App.Test(req)
 		a.NoError(err)
