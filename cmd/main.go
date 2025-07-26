@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"go.uber.org/zap"
 	"idm/inner/common"
 	"idm/inner/database"
@@ -59,6 +62,9 @@ func gracefulShutdown(server *web.Server, wg *sync.WaitGroup, logger *common.Log
 func build() *web.Server {
 	var cfg = common.GetConfig(".env")
 	var server = web.NewServer()
+
+	RegisterMiddleware(server.App)
+
 	var dataBase = database.ConnectDbWithCfg(cfg)
 
 	var employeeRepo = employee.NewEmployeeRepository(dataBase)
@@ -73,4 +79,9 @@ func build() *web.Server {
 	infoController.RegisterRoutes()
 
 	return server
+}
+
+func RegisterMiddleware(app *fiber.App) {
+	app.Use(recover.New())
+	app.Use(requestid.New())
 }
