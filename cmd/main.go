@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 	"idm/inner/common"
 	"idm/inner/database"
@@ -18,7 +19,7 @@ import (
 )
 
 func main() {
-	var server = build()
+	var server, db = build()
 	var cfg = common.GetConfig(".env")
 	var logger = common.NewLogger(cfg)
 	// Запускаем сервер в отдельной горутине
@@ -29,23 +30,23 @@ func main() {
 		}
 	}()
 
-	// Создаем группу для ожидания сигнала завершения работы сервера
-	var wg = &sync.WaitGroup{}
-	wg.Add(1)
-	// Запускаем gracefulShutdown в отдельной горутине
-	go gracefulShutdown(server, wg, logger)
-	// Ожидаем сигнал от горутины gracefulShutdown, что сервер завершил работу
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go gracefulShutdown(server, ctx, &wg, logger)
+	go closeDb(db, ctx, &wg, logger)
+
 	wg.Wait()
 	logger.Sugar().Info("Graceful shutdown complete.")
 }
 
 // Функция "элегантного" завершения работы сервера по сигналу от операционной системы
-func gracefulShutdown(server *web.Server, wg *sync.WaitGroup, logger *common.Logger) {
+func gracefulShutdown(server *web.Server, ctx context.Context, wg *sync.WaitGroup, logger *common.Logger) {
 	// Уведомить основную горутину о завершении работы
 	defer wg.Done()
-	// Создаём контекст, который слушает сигналы прерывания от операционной системы
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
-	defer stop()
 	// Слушаем сигнал прерывания от операционной системы
 	<-ctx.Done()
 	logger.Sugar().Info("shutting down gracefully, press Ctrl+C again to force")
@@ -59,15 +60,28 @@ func gracefulShutdown(server *web.Server, wg *sync.WaitGroup, logger *common.Log
 	logger.Sugar().Info("Server exiting")
 }
 
-func build() *web.Server {
+func closeDb(db *sqlx.DB, ctx context.Context, wg *sync.WaitGroup, logger *common.Logger) {
+	// Уведомить основную горутину о завершении работы
+	defer wg.Done()
+	// Слушаем сигнал прерывания от операционной системы
+	<-ctx.Done()
+	err := db.Close()
+	if err != nil {
+		logger.Sugar().Error("Database close error:", zap.Error(err))
+		return
+	}
+	logger.Sugar().Info("Db closed.")
+}
+
+func build() (*web.Server, *sqlx.DB) {
 	var cfg = common.GetConfig(".env")
 	var server = web.NewServer()
 
 	RegisterMiddleware(server.App)
 
-	var dataBase = database.ConnectDbWithCfg(cfg)
+	var db = database.ConnectDbWithCfg(cfg)
 
-	var employeeRepo = employee.NewEmployeeRepository(dataBase)
+	var employeeRepo = employee.NewEmployeeRepository(db)
 	var employeeService = employee.NewService(employeeRepo)
 	//создаём логгер
 	var logger = common.NewLogger(cfg)
@@ -78,7 +92,7 @@ func build() *web.Server {
 	var infoController = info.NewController(server, cfg)
 	infoController.RegisterRoutes()
 
-	return server
+	return server, db
 }
 
 func RegisterMiddleware(app *fiber.App) {
