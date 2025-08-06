@@ -48,6 +48,7 @@ func (s *StubRepo) DeleteById(id int64) error {
 func (s *StubRepo) DeleteByIds(ids []int64) error {
 	panic("not implemented")
 }
+func (s *StubRepo) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) { panic("implement me") }
 
 func TestFindAll_WithStub(t *testing.T) {
 	svc := NewService(&StubRepo{})
