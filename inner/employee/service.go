@@ -27,6 +27,7 @@ type Repo interface {
 	BeginTransaction() (*sqlx.Tx, error)
 	FindByNameTx(tx *sqlx.Tx, name string) (bool, error)
 	SaveTx(tx *sqlx.Tx, employee *Entity) (int64, error)
+	FindEmployeesPage(req PageRequest) ([]Entity, int64, error)
 }
 
 // функция-конструктор
@@ -140,4 +141,26 @@ func (svc *Service) SaveWithTransaction(e CreateRequest) (int64, error) {
 		err = fmt.Errorf("error creating employee with name: %s %v", e.Name, err)
 	}
 	return newEmployeeId, err
+}
+
+func (svc *Service) GetEmployeesPage(req PageRequest) (PageResponse, error) {
+	if err := svc.validator.Validate(req); err != nil {
+		return PageResponse{}, common.RequestValidationError{Message: err.Error()}
+	}
+	entities, total, err := svc.repo.FindEmployeesPage(req)
+	if err != nil {
+		return PageResponse{}, err
+	}
+
+	var respItems []Response
+	for _, e := range entities {
+		respItems = append(respItems, e.toResponse())
+	}
+
+	return PageResponse{
+		Result:     respItems,
+		PageSize:   req.PageSize,
+		PageNumber: req.PageNumber,
+		Total:      total,
+	}, nil
 }

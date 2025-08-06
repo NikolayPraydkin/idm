@@ -71,6 +71,11 @@ func (m *MockRepo) FindByIds(ids []int64) ([]Entity, error) {
 	return args.Get(0).([]Entity), args.Error(1)
 }
 
+func (m *MockRepo) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) {
+	args := m.Called(req)
+	return args.Get(0).([]Entity), args.Get(1).(int64), args.Error(2)
+}
+
 func (m *MockRepo) DeleteById(id int64) error {
 	args := m.Called(id)
 	return args.Error(0)

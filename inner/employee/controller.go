@@ -25,6 +25,7 @@ type Svc interface {
 	DeleteById(id int64) error
 	DeleteByIds(ids []int64) error
 	SaveWithTransaction(e CreateRequest) (int64, error)
+	GetEmployeesPage(req PageRequest) (PageResponse, error)
 }
 
 func NewController(server *web.Server, employeeService Svc, logger *common.Logger) *Controller {
@@ -40,11 +41,12 @@ func (c *Controller) RegisterRoutes() {
 	c.server.GroupApiV1.Post("/employees", c.CreateEmployee)
 	c.server.GroupApiV1.Post("/employees/add", c.AddEmployee)
 	c.server.GroupApiV1.Post("/employees/save", c.SaveEmployee)
-	c.server.GroupApiV1.Get("/employees/:id", c.GetEmployee)
 	c.server.GroupApiV1.Get("/employees", c.GetAllEmployees)
-	c.server.GroupApiV1.Post("/employees/batch", c.GetEmployeesByIds)
-	c.server.GroupApiV1.Delete("/employees/:id", c.DeleteEmployeeById)
 	c.server.GroupApiV1.Delete("/employees", c.DeleteEmployeesByIds)
+	c.server.GroupApiV1.Get("/employees/page", c.GetEmployeesPage)
+	c.server.GroupApiV1.Post("/employees/batch", c.GetEmployeesByIds)
+	c.server.GroupApiV1.Get("/employees/:id", c.GetEmployee)
+	c.server.GroupApiV1.Delete("/employees/:id", c.DeleteEmployeeById)
 }
 
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
@@ -154,6 +156,21 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
 	}
 	return common.OkResponse(ctx, resps)
+}
+
+func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
+	var req PageRequest
+	if err := ctx.QueryParser(&req); err != nil {
+		return common.ErrResponse(ctx, fiber.StatusBadRequest, "bad query params")
+	}
+	pageResp, err := c.employeeService.GetEmployeesPage(req)
+	if err != nil {
+		if errors.As(err, &common.RequestValidationError{}) {
+			return common.ErrResponse(ctx, fiber.StatusBadRequest, err.Error())
+		}
+		return common.ErrResponse(ctx, fiber.StatusInternalServerError, err.Error())
+	}
+	return common.OkResponse(ctx, pageResp)
 }
 
 // GetEmployeesByIds handles POST /api/v1/employees/batch

@@ -32,3 +32,15 @@ type CreateRequest struct {
 func (req *CreateRequest) ToEntity() *Entity {
 	return &Entity{Name: req.Name}
 }
+
+type PageRequest struct {
+	PageSize   int `validate:"min=1,max=100"`
+	PageNumber int `validate:"min=0"`
+}
+
+type PageResponse struct {
+	Result     any   `json:"result"`
+	PageSize   int   `json:"page_size"`
+	PageNumber int   `json:"page_number"`
+	Total      int64 `json:"total"`
+}

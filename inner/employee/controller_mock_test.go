@@ -66,6 +66,11 @@ func (svc *MockService) CreateEmployee(request CreateRequest) (int64, error) {
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (svc *MockService) GetEmployeesPage(req PageRequest) (PageResponse, error) {
+	args := svc.Called(req)
+	return args.Get(0).(PageResponse), args.Error(1)
+}
+
 func TestCreateEmployee(t *testing.T) {
 	var a = assert.New(t)
 
@@ -269,4 +274,33 @@ func TestGetEmployee(t *testing.T) {
 		a.NoError(err)
 		a.Equal(fiber.StatusInternalServerError, resp.StatusCode)
 	})
+}
+
+func TestGetEmployeesPageValidation(t *testing.T) {
+	a := assert.New(t)
+
+	tests := []struct {
+		name       string
+		query      string
+		statusCode int
+	}{
+		{"page size too small", "?pageSize=0&pageNumber=1", fiber.StatusBadRequest},
+		{"page size too large", "?pageSize=101&pageNumber=1", fiber.StatusBadRequest},
+		{"page number negative", "?pageSize=10&pageNumber=-1", fiber.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := web.NewServer()
+			repo := new(MockRepo)
+			svc := newTestService(repo)
+			controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
+			controller.RegisterRoutes()
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/employees/page"+tt.query, nil)
+			resp, err := server.App.Test(req, -1)
+			a.NoError(err)
+			a.Equal(tt.statusCode, resp.StatusCode)
+		})
+	}
 }
