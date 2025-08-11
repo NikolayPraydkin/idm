@@ -8,9 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 	"idm/inner/common"
-	"idm/inner/database"
-	"idm/inner/employee"
-	"idm/inner/info"
+	"idm/inner/server"
 	"idm/inner/web"
 	"os/signal"
 	"sync"
@@ -19,14 +17,14 @@ import (
 )
 
 func main() {
-	var server, db = build()
+	var srv, db = server.Build()
 	var cfg = common.GetConfig(".env")
 	var logger = common.NewLogger(cfg)
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		var err = server.App.Listen(":8080")
+		var err = srv.App.Listen(":8080")
 		if err != nil {
-			logger.Panic("http server error: %s", zap.Error(err))
+			logger.Panic("http srv error: %s", zap.Error(err))
 		}
 	}()
 
@@ -36,7 +34,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go gracefulShutdown(server, ctx, &wg, logger)
+	go gracefulShutdown(srv, ctx, &wg, logger)
 	go closeDb(db, ctx, &wg, logger)
 
 	wg.Wait()
@@ -71,28 +69,6 @@ func closeDb(db *sqlx.DB, ctx context.Context, wg *sync.WaitGroup, logger *commo
 		return
 	}
 	logger.Sugar().Info("Db closed.")
-}
-
-func build() (*web.Server, *sqlx.DB) {
-	var cfg = common.GetConfig(".env")
-	var server = web.NewServer()
-
-	RegisterMiddleware(server.App)
-
-	var db = database.ConnectDbWithCfg(cfg)
-
-	var employeeRepo = employee.NewEmployeeRepository(db)
-	var employeeService = employee.NewService(employeeRepo)
-	//создаём логгер
-	var logger = common.NewLogger(cfg)
-	// создаём контроллер
-	var employeeController = employee.NewController(server, employeeService, logger)
-	employeeController.RegisterRoutes()
-
-	var infoController = info.NewController(server, cfg)
-	infoController.RegisterRoutes()
-
-	return server, db
 }
 
 func RegisterMiddleware(app *fiber.App) {

@@ -90,3 +90,22 @@ func (r *Repository) SaveTx(tx *sqlx.Tx, employee *Entity) (employeeId int64, er
 	)
 	return employeeId, err
 }
+
+func (r *Repository) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) {
+	var offset = req.PageNumber * req.PageSize
+	var limit = req.PageSize
+	var entities []Entity
+	err := r.db.Select(&entities,
+		`SELECT id, name FROM employee ORDER BY id LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var total int64
+	err = r.db.Get(&total, `SELECT COUNT(*) FROM employee`)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return entities, total, nil
+}
