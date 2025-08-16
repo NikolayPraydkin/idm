@@ -2,6 +2,7 @@ package employee
 
 import (
 	"github.com/jmoiron/sqlx"
+	"strings"
 )
 
 type Repository struct {
@@ -94,15 +95,20 @@ func (r *Repository) SaveTx(tx *sqlx.Tx, employee *Entity) (employeeId int64, er
 func (r *Repository) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) {
 	var offset = req.PageNumber * req.PageSize
 	var limit = req.PageSize
+	var filter = req.TextFilter
+	var partQueryFilter = ""
+	if len(strings.TrimSpace(filter)) >= 3 {
+		partQueryFilter = filter
+	}
 	var entities []Entity
 	err := r.db.Select(&entities,
-		`SELECT id, name FROM employee ORDER BY id LIMIT $1 OFFSET $2`, limit, offset)
+		`SELECT id, name FROM employee WHERE ($1 = '' OR name ILIKE '%' || $1 || '%') ORDER BY id LIMIT $2 OFFSET $3`, partQueryFilter, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var total int64
-	err = r.db.Get(&total, `SELECT COUNT(*) FROM employee`)
+	err = r.db.Get(&total, `SELECT COUNT(*) FROM employee where ($1 = '' OR name ILIKE '%' || $1 || '%')`, partQueryFilter)
 	if err != nil {
 		return nil, 0, err
 	}

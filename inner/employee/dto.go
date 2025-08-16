@@ -36,6 +36,7 @@ func (req *CreateRequest) ToEntity() *Entity {
 type PageRequest struct {
 	PageSize   int `validate:"min=1,max=100"`
 	PageNumber int `validate:"min=0"`
+	TextFilter string
 }
 
 type PageResponse struct {
