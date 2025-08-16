@@ -123,83 +123,79 @@ func Test_EmployeeSearchByNameIntegration(t *testing.T) {
 		} `json:"data"`
 	}
 
-	// Предполагаем, что имя параметра фильтра — textFilter (как в PageRequest.TextFilter)
-	// 1) нет фильтра / пустая строка / только пробелы и управляющие символы => фильтр игнорится
-	t.Run("NoTextFilterParam", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, len(names), len(r.Data.Result))
-	})
+	type testCase struct {
+		name          string
+		query         string
+		wantStatus    int
+		wantCount     int
+		wantNamesOnly []string
+	}
 
-	t.Run("EmptyString", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, len(names), len(r.Data.Result))
-	})
+	tests := []testCase{
+		{
+			name:       "NoTextFilterParam",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "EmptyString",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "WhitespaceOnly",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%20%20%20",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "WhitespaceTabsNewlines",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%09%0A",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "FilterLessThan3",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=al",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:          "FilterAtLeast3",
+			query:         "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=ali",
+			wantStatus:    200,
+			wantCount:     2,
+			wantNamesOnly: []string{"Alice", "ALINA"},
+		},
+	}
 
-	t.Run("WhitespaceOnly", func(t *testing.T) {
-		// три пробела
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%20%20%20", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, len(names), len(r.Data.Result))
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.query, nil)
+			resp, err := srv.App.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantStatus, resp.StatusCode)
 
-	t.Run("WhitespaceTabsNewlines", func(t *testing.T) {
-		// таб и перевод строки: %09 = \t, %0A = \n
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%09%0A", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, len(names), len(r.Data.Result))
-	})
+			if tc.wantStatus != 200 {
+				return
+			}
 
-	// 2) фильтр короче 3 символов => считаем, что он игнорируется
-	t.Run("FilterLessThan3", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=al", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, len(names), len(r.Data.Result))
-	})
+			body, _ := io.ReadAll(resp.Body)
+			var r respDTO
+			_ = json.Unmarshal(body, &r)
+			assert.Equal(t, tc.wantCount, len(r.Data.Result))
 
-	// 3) фильтр от 3 символов => применяется регистронезависимый поиск подстроки
-	t.Run("FilterAtLeast3", func(t *testing.T) {
-		// "ali" должен найти "Alice" и "ALINA" (2 совпадения)
-		req := httptest.NewRequest("GET", "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=ali", nil)
-		resp, err := srv.App.Test(req, -1)
-		assert.NoError(t, err)
-		assert.Equal(t, 200, resp.StatusCode)
-		body, _ := io.ReadAll(resp.Body)
-		var r respDTO
-		_ = json.Unmarshal(body, &r)
-		assert.Equal(t, 2, len(r.Data.Result))
-		// Дополнительно можно убедиться, что вернулись именно нужные имена
-		got := make(map[string]bool)
-		for _, e := range r.Data.Result {
-			got[e.Name] = true
-		}
-		assert.True(t, got["Alice"])
-		assert.True(t, got["ALINA"])
-	})
+			if len(tc.wantNamesOnly) > 0 {
+				got := make(map[string]bool)
+				for _, e := range r.Data.Result {
+					got[e.Name] = true
+				}
+				for _, expected := range tc.wantNamesOnly {
+					assert.Truef(t, got[expected], "expected name %q not found in result", expected)
+				}
+			}
+		})
+	}
 }
