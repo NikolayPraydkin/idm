@@ -93,3 +93,109 @@ func Test_EmployeePaginationIntegration(t *testing.T) {
 	}
 
 }
+
+func Test_EmployeeSearchByNameIntegration(t *testing.T) {
+	TruncateTable(testDB)
+	db, _ := CreateTestDB()
+
+	// Фиксируем набор данных для поиска
+	names := []string{"Alice", "ALINA", "Bob", "alex", "Maria"}
+	for _, n := range names {
+		_, err := db.Exec("INSERT INTO employee (name) VALUES ($1)", n)
+		assert.NoError(t, err)
+	}
+
+	srv, _ := server.Build()
+
+	type respDTO struct {
+		Success bool   `json:"success"`
+		Message string `json:"error"`
+		Data    struct {
+			Result []struct {
+				ID        int    `json:"id"`
+				Name      string `json:"name"`
+				CreatedAt string `json:"created_at"`
+				UpdatedAt string `json:"updated_at"`
+			} `json:"result"`
+			PageSize   int   `json:"page_size"`
+			PageNumber int   `json:"page_number"`
+			Total      int64 `json:"total"`
+		} `json:"data"`
+	}
+
+	type testCase struct {
+		name          string
+		query         string
+		wantStatus    int
+		wantCount     int
+		wantNamesOnly []string
+	}
+
+	tests := []testCase{
+		{
+			name:       "NoTextFilterParam",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "EmptyString",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "WhitespaceOnly",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%20%20%20",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "WhitespaceTabsNewlines",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=%09%0A",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:       "FilterLessThan3",
+			query:      "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=al",
+			wantStatus: 200,
+			wantCount:  len(names),
+		},
+		{
+			name:          "FilterAtLeast3",
+			query:         "/api/v1/employees/page?pageNumber=0&pageSize=50&textFilter=ali",
+			wantStatus:    200,
+			wantCount:     2,
+			wantNamesOnly: []string{"Alice", "ALINA"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.query, nil)
+			resp, err := srv.App.Test(req, -1)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantStatus, resp.StatusCode)
+
+			if tc.wantStatus != 200 {
+				return
+			}
+
+			body, _ := io.ReadAll(resp.Body)
+			var r respDTO
+			_ = json.Unmarshal(body, &r)
+			assert.Equal(t, tc.wantCount, len(r.Data.Result))
+
+			if len(tc.wantNamesOnly) > 0 {
+				got := make(map[string]bool)
+				for _, e := range r.Data.Result {
+					got[e.Name] = true
+				}
+				for _, expected := range tc.wantNamesOnly {
+					assert.Truef(t, got[expected], "expected name %q not found in result", expected)
+				}
+			}
+		})
+	}
+}
