@@ -1,0 +1,378 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "IDM API documentation",
+        "contact": {}
+    },
+    "basePath": "/api/v1/",
+    "paths": {
+        "/employees": {
+            "get": {
+                "description": "Returns all employees",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "List employees",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/employee.Response"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new employee.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "create a new employee",
+                "parameters": [
+                    {
+                        "description": "create employee request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/employee.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/idm_inner_common.Response-int64"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes employees with the specified ids",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Delete employees by ids",
+                "parameters": [
+                    {
+                        "description": "employee ids",
+                        "name": "ids",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/add": {
+            "post": {
+                "description": "Add a new employee (no id returned)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Add employee",
+                "parameters": [
+                    {
+                        "description": "create employee request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/employee.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/batch": {
+            "post": {
+                "description": "Returns employees by the given ids",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Get employees by ids",
+                "parameters": [
+                    {
+                        "description": "employee ids",
+                        "name": "ids",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/employee.Response"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/page": {
+            "get": {
+                "description": "Returns paginated list of employees",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Get employees page",
+                "parameters": [
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "name": "pageNumber",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "textFilter",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/employee.PageResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/save": {
+            "post": {
+                "description": "Create or update employee and return its id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Save employee",
+                "parameters": [
+                    {
+                        "description": "save employee request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/employee.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer",
+                                "format": "int64"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/{id}": {
+            "get": {
+                "description": "Returns employee by id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Get employee by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "employee id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/employee.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes employee with the specified id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employee"
+                ],
+                "summary": "Delete employee by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "employee id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "employee.CreateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 155,
+                    "minLength": 2
+                }
+            }
+        },
+        "employee.PageResponse": {
+            "type": "object",
+            "properties": {
+                "page_number": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "result": {},
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "employee.Response": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "idm_inner_common.Response-int64": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+}
