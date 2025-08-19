@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
+	"idm/docs"
 	"idm/inner/common"
 	"idm/inner/server"
 	"idm/inner/web"
@@ -16,9 +17,14 @@ import (
 	"time"
 )
 
+// @title IDM API documentation
+// @BasePath /api/v1/
 func main() {
 	var srv, db = server.Build()
 	var cfg = common.GetConfig(".env")
+	// Переопределяем версию приложения, которая будет отображаться в swagger UI.
+	// Пакет docs и структура SwaggerInfo в нём появятся поле генерации документации (см. далее).
+	docs.SwaggerInfo.Version = cfg.AppVersion
 	var logger = common.NewLogger(cfg)
 	// Запускаем сервер в отдельной горутине
 	go func() {
