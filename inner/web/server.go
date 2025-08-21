@@ -1,6 +1,10 @@
 package web
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/swagger"
+	_ "idm/docs"
+)
 
 // структуа веб-сервера
 type Server struct {
@@ -22,6 +26,8 @@ func NewServer() *Server {
 	groupApiV1 := groupApi.Group("/v1")
 
 	groupInternal := groupApi.Group("/internal")
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
 	return &Server{
 		App:           app,
 		GroupApiV1:    groupApiV1,

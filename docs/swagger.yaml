@@ -1,0 +1,247 @@
+basePath: /api/v1/
+definitions:
+  employee.CreateRequest:
+    properties:
+      name:
+        maxLength: 155
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  employee.PageResponse:
+    properties:
+      page_number:
+        type: integer
+      page_size:
+        type: integer
+      result: {}
+      total:
+        type: integer
+    type: object
+  employee.Response:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  idm_inner_common.Response-int64:
+    properties:
+      data:
+        type: integer
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+info:
+  contact: {}
+  title: IDM API documentation
+paths:
+  /employees:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes employees with the specified ids
+      parameters:
+      - description: employee ids
+        in: body
+        name: ids
+        required: true
+        schema:
+          items:
+            type: integer
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete employees by ids
+      tags:
+      - employee
+    get:
+      description: Returns all employees
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/employee.Response'
+            type: array
+      summary: List employees
+      tags:
+      - employee
+    post:
+      consumes:
+      - application/json
+      description: Create a new employee.
+      parameters:
+      - description: create employee request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/idm_inner_common.Response-int64'
+      summary: create a new employee
+      tags:
+      - employee
+  /employees/{id}:
+    delete:
+      description: Deletes employee with the specified id
+      parameters:
+      - description: employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete employee by id
+      tags:
+      - employee
+    get:
+      description: Returns employee by id
+      parameters:
+      - description: employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/employee.Response'
+      summary: Get employee by id
+      tags:
+      - employee
+  /employees/add:
+    post:
+      consumes:
+      - application/json
+      description: Add a new employee (no id returned)
+      parameters:
+      - description: create employee request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Add employee
+      tags:
+      - employee
+  /employees/batch:
+    post:
+      consumes:
+      - application/json
+      description: Returns employees by the given ids
+      parameters:
+      - description: employee ids
+        in: body
+        name: ids
+        required: true
+        schema:
+          items:
+            type: integer
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/employee.Response'
+            type: array
+      summary: Get employees by ids
+      tags:
+      - employee
+  /employees/page:
+    get:
+      description: Returns paginated list of employees
+      parameters:
+      - in: query
+        minimum: 0
+        name: pageNumber
+        type: integer
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      - in: query
+        name: textFilter
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/employee.PageResponse'
+      summary: Get employees page
+      tags:
+      - employee
+  /employees/save:
+    post:
+      consumes:
+      - application/json
+      description: Create or update employee and return its id
+      parameters:
+      - description: save employee request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/employee.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+      summary: Save employee
+      tags:
+      - employee
+swagger: "2.0"

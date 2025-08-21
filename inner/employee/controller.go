@@ -49,6 +49,15 @@ func (c *Controller) RegisterRoutes() {
 	c.server.GroupApiV1.Delete("/employees/:id", c.DeleteEmployeeById)
 }
 
+// Функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/employees"
+// @Description Create a new employee.
+// @Summary create a new employee
+// @Tags employee
+// @Accept json
+// @Produce json
+// @Param request body employee.CreateRequest true "create employee request"
+// @Success 200 {object} common.Response[int64]
+// @Router /employees [post]
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 
 	// анмаршалим JSON body запроса в структуру CreateRequest
@@ -85,6 +94,15 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 	return nil
 }
 
+// AddEmployee godoc
+// @Summary      Add employee
+// @Description  Add a new employee (no id returned)
+// @Tags         employee
+// @Accept       json
+// @Produce      json
+// @Param        request  body      employee.CreateRequest  true  "create employee request"
+// @Success      200      {object}  map[string]string
+// @Router       /employees/add [post]
 // AddEmployee handles POST /api/v1/employees/add
 func (c *Controller) AddEmployee(ctx *fiber.Ctx) error {
 	var req CreateRequest
@@ -107,6 +125,15 @@ func (c *Controller) AddEmployee(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, fiber.Map{"message": "added"})
 }
 
+// SaveEmployee godoc
+// @Summary      Save employee
+// @Description  Create or update employee and return its id
+// @Tags         employee
+// @Accept       json
+// @Produce      json
+// @Param        request  body      employee.CreateRequest  true  "save employee request"
+// @Success      200      {object}  map[string]int64
+// @Router       /employees/save [post]
 // SaveEmployee handles POST /api/v1/employees/save
 func (c *Controller) SaveEmployee(ctx *fiber.Ctx) error {
 	var req CreateRequest
@@ -130,6 +157,14 @@ func (c *Controller) SaveEmployee(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, fiber.Map{"id": id})
 }
 
+// GetEmployee godoc
+// @Summary      Get employee by id
+// @Description  Returns employee by id
+// @Tags         employee
+// @Produce      json
+// @Param        id   path      int  true  "employee id"
+// @Success      200  {object}  employee.Response
+// @Router       /employees/{id} [get]
 // GetEmployee handles GET /api/v1/employees/:id
 func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
@@ -148,6 +183,13 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, resp)
 }
 
+// GetAllEmployees godoc
+// @Summary      List employees
+// @Description  Returns all employees
+// @Tags         employee
+// @Produce      json
+// @Success      200  {array}  employee.Response
+// @Router       /employees [get]
 // GetAllEmployees handles GET /api/v1/employees
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 	resps, err := c.employeeService.FindAll()
@@ -158,6 +200,14 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, resps)
 }
 
+// GetEmployeesPage godoc
+// @Summary      Get employees page
+// @Description  Returns paginated list of employees
+// @Tags         employee
+// @Produce      json
+// @Param        request  query     employee.PageRequest  true  "page request"
+// @Success      200      {object}  employee.PageResponse
+// @Router       /employees/page [get]
 func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	var req PageRequest
 	if err := ctx.QueryParser(&req); err != nil {
@@ -173,6 +223,15 @@ func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, pageResp)
 }
 
+// GetEmployeesByIds godoc
+// @Summary      Get employees by ids
+// @Description  Returns employees by the given ids
+// @Tags         employee
+// @Accept       json
+// @Produce      json
+// @Param        ids  body      []int64  true  "employee ids"
+// @Success      200  {array}   employee.Response
+// @Router       /employees/batch [post]
 // GetEmployeesByIds handles POST /api/v1/employees/batch
 func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	var ids []int64
@@ -188,6 +247,14 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, resps)
 }
 
+// DeleteEmployeeById godoc
+// @Summary      Delete employee by id
+// @Description  Deletes employee with the specified id
+// @Tags         employee
+// @Produce      json
+// @Param        id   path      int  true  "employee id"
+// @Success      200  {object}  map[string]string
+// @Router       /employees/{id} [delete]
 // DeleteEmployeeById handles DELETE /api/v1/employees/:id
 func (c *Controller) DeleteEmployeeById(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
@@ -204,6 +271,15 @@ func (c *Controller) DeleteEmployeeById(ctx *fiber.Ctx) error {
 	return common.OkResponse(ctx, fiber.Map{"message": "deleted"})
 }
 
+// DeleteEmployeesByIds godoc
+// @Summary      Delete employees by ids
+// @Description  Deletes employees with the specified ids
+// @Tags         employee
+// @Accept       json
+// @Produce      json
+// @Param        ids  body      []int64  true  "employee ids"
+// @Success      200  {object}  map[string]string
+// @Router       /employees [delete]
 // DeleteEmployeesByIds handles DELETE /api/v1/employees
 func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	var ids []int64
