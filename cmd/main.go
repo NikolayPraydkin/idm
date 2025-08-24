@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
@@ -26,9 +27,22 @@ func main() {
 	// Пакет docs и структура SwaggerInfo в нём появятся поле генерации документации (см. далее).
 	docs.SwaggerInfo.Version = cfg.AppVersion
 	var logger = common.NewLogger(cfg)
+
+	// загружаем сертификаты
+	cer, err := tls.LoadX509KeyPair(cfg.SslSert, cfg.SslKey)
+	if err != nil {
+		logger.Panic("failed certificate loading: %s", zap.Error(err))
+	}
+	// создаём конфигурацию TLS сервера
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cer}}
+	// создаём слушателя https соединения
+	ln, err := tls.Listen("tcp", ":8080", tlsConfig)
+	if err != nil {
+		logger.Panic("failed TLS listener creating: %s", zap.Error(err))
+	}
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		var err = srv.App.Listen(":8080")
+		var err = srv.App.Listener(ln)
 		if err != nil {
 			logger.Panic("http srv error: %s", zap.Error(err))
 		}
