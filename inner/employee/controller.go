@@ -137,7 +137,7 @@ func (c *Controller) RegisterRoutes() {
 	grp.Get("/:id", requireAnyRole(web.IdmAdmin, web.IdmUser), c.GetEmployee)
 }
 
-// Функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/employees"
+// CreateEmployee Функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/employees"
 // @Description Create a new employee.
 // @Summary create a new employee
 // @Tags employee

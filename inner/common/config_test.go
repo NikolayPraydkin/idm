@@ -6,8 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"idm/inner/validator"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func writeDotEnvFile(path, content string) {
@@ -139,7 +140,7 @@ func Test_Config_Loading_TableDriven(t *testing.T) {
 	}
 }
 
-// Таблица: валидация TLS-полей (требуются оба: SSL_SERT и SSL_KEY)
+// Таблица: валидация TLS-полей (требуются оба: SSL_CERT и SSL_KEY)
 func Test_Config_TLSValidation_TableDriven(t *testing.T) {
 	t.Parallel()
 
@@ -153,6 +154,7 @@ func Test_Config_TLSValidation_TableDriven(t *testing.T) {
 			dotEnvVars: map[string]string{
 				"DB_DRIVER_NAME": "driver", "DB_DSN": "dsn",
 				"APP_NAME": "app", "APP_VERSION": "1.0",
+				"KEYCLOAK_JWK_URL": "http://localhost:9990/realms/idm/protocol/openid-connect/certs",
 				// TLS отсутствует
 			},
 			wantError: true,
@@ -162,7 +164,8 @@ func Test_Config_TLSValidation_TableDriven(t *testing.T) {
 			dotEnvVars: map[string]string{
 				"DB_DRIVER_NAME": "driver", "DB_DSN": "dsn",
 				"APP_NAME": "app", "APP_VERSION": "1.0",
-				"SSL_SERT": "/certs/ssl.crt",
+				"KEYCLOAK_JWK_URL": "http://localhost:9990/realms/idm/protocol/openid-connect/certs",
+				"SSL_CERT":         "/certs/ssl.crt",
 			},
 			wantError: true,
 		},
@@ -171,7 +174,8 @@ func Test_Config_TLSValidation_TableDriven(t *testing.T) {
 			dotEnvVars: map[string]string{
 				"DB_DRIVER_NAME": "driver", "DB_DSN": "dsn",
 				"APP_NAME": "app", "APP_VERSION": "1.0",
-				"SSL_KEY": "/certs/ssl.key",
+				"KEYCLOAK_JWK_URL": "http://localhost:9990/realms/idm/protocol/openid-connect/certs",
+				"SSL_KEY":          "/certs/ssl.key",
 			},
 			wantError: true,
 		},
@@ -180,7 +184,8 @@ func Test_Config_TLSValidation_TableDriven(t *testing.T) {
 			dotEnvVars: map[string]string{
 				"DB_DRIVER_NAME": "driver", "DB_DSN": "dsn",
 				"APP_NAME": "app", "APP_VERSION": "1.0",
-				"SSL_SERT": "/certs/ssl.crt", "SSL_KEY": "/certs/ssl.key",
+				"KEYCLOAK_JWK_URL": "http://localhost:9990/realms/idm/protocol/openid-connect/certs",
+				"SSL_CERT":         "/certs/ssl.crt", "SSL_KEY": "/certs/ssl.key",
 			},
 			wantError: false,
 		},
