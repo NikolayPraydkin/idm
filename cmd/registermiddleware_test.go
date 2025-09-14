@@ -6,9 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"idm/inner/web"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
-	"idm/inner/web"
 )
 
 // Test that registerMiddleware applies the recover middleware correctly

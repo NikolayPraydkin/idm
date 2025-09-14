@@ -1,6 +1,15 @@
 basePath: /api/v1/
 definitions:
-  employee.CreateRequest:
+  idm_inner_common.Response-int64:
+    properties:
+      data:
+        type: integer
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  inner_employee.CreateRequest:
     properties:
       name:
         maxLength: 155
@@ -9,7 +18,7 @@ definitions:
     required:
     - name
     type: object
-  employee.PageResponse:
+  inner_employee.PageResponse:
     properties:
       page_number:
         type: integer
@@ -19,7 +28,7 @@ definitions:
       total:
         type: integer
     type: object
-  employee.Response:
+  inner_employee.Response:
     properties:
       created_at:
         type: string
@@ -29,15 +38,6 @@ definitions:
         type: string
       updated_at:
         type: string
-    type: object
-  idm_inner_common.Response-int64:
-    properties:
-      data:
-        type: integer
-      error:
-        type: string
-      success:
-        type: boolean
     type: object
 info:
   contact: {}
@@ -66,6 +66,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Delete employees by ids
       tags:
       - employee
@@ -78,8 +80,10 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/employee.Response'
+              $ref: '#/definitions/inner_employee.Response'
             type: array
+      security:
+      - BearerAuth: []
       summary: List employees
       tags:
       - employee
@@ -93,7 +97,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/employee.CreateRequest'
+          $ref: '#/definitions/inner_employee.CreateRequest'
       produces:
       - application/json
       responses:
@@ -101,6 +105,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/idm_inner_common.Response-int64'
+      security:
+      - BearerAuth: []
       summary: create a new employee
       tags:
       - employee
@@ -122,6 +128,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Delete employee by id
       tags:
       - employee
@@ -139,7 +147,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/employee.Response'
+            $ref: '#/definitions/inner_employee.Response'
+      security:
+      - BearerAuth: []
       summary: Get employee by id
       tags:
       - employee
@@ -154,7 +164,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/employee.CreateRequest'
+          $ref: '#/definitions/inner_employee.CreateRequest'
       produces:
       - application/json
       responses:
@@ -164,6 +174,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Add employee
       tags:
       - employee
@@ -188,8 +200,10 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/employee.Response'
+              $ref: '#/definitions/inner_employee.Response'
             type: array
+      security:
+      - BearerAuth: []
       summary: Get employees by ids
       tags:
       - employee
@@ -215,7 +229,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/employee.PageResponse'
+            $ref: '#/definitions/inner_employee.PageResponse'
+      security:
+      - BearerAuth: []
       summary: Get employees page
       tags:
       - employee
@@ -230,7 +246,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/employee.CreateRequest'
+          $ref: '#/definitions/inner_employee.CreateRequest'
       produces:
       - application/json
       responses:
@@ -241,7 +257,14 @@ paths:
               format: int64
               type: integer
             type: object
+      security:
+      - BearerAuth: []
       summary: Save employee
       tags:
       - employee
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

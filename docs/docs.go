@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/employees": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns all employees",
                 "produces": [
                     "application/json"
@@ -31,13 +36,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/employee.Response"
+                                "$ref": "#/definitions/inner_employee.Response"
                             }
                         }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create a new employee.",
                 "consumes": [
                     "application/json"
@@ -56,7 +66,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/employee.CreateRequest"
+                            "$ref": "#/definitions/inner_employee.CreateRequest"
                         }
                     }
                 ],
@@ -70,6 +80,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Deletes employees with the specified ids",
                 "consumes": [
                     "application/json"
@@ -110,6 +125,11 @@ const docTemplate = `{
         },
         "/employees/add": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Add a new employee (no id returned)",
                 "consumes": [
                     "application/json"
@@ -128,7 +148,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/employee.CreateRequest"
+                            "$ref": "#/definitions/inner_employee.CreateRequest"
                         }
                     }
                 ],
@@ -147,6 +167,11 @@ const docTemplate = `{
         },
         "/employees/batch": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns employees by the given ids",
                 "consumes": [
                     "application/json"
@@ -178,7 +203,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/employee.Response"
+                                "$ref": "#/definitions/inner_employee.Response"
                             }
                         }
                     }
@@ -187,6 +212,11 @@ const docTemplate = `{
         },
         "/employees/page": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns paginated list of employees",
                 "produces": [
                     "application/json"
@@ -219,7 +249,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/employee.PageResponse"
+                            "$ref": "#/definitions/inner_employee.PageResponse"
                         }
                     }
                 }
@@ -227,6 +257,11 @@ const docTemplate = `{
         },
         "/employees/save": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create or update employee and return its id",
                 "consumes": [
                     "application/json"
@@ -245,7 +280,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/employee.CreateRequest"
+                            "$ref": "#/definitions/inner_employee.CreateRequest"
                         }
                     }
                 ],
@@ -265,6 +300,11 @@ const docTemplate = `{
         },
         "/employees/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns employee by id",
                 "produces": [
                     "application/json"
@@ -286,12 +326,17 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/employee.Response"
+                            "$ref": "#/definitions/inner_employee.Response"
                         }
                     }
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Deletes employee with the specified id",
                 "produces": [
                     "application/json"
@@ -324,7 +369,21 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "employee.CreateRequest": {
+        "idm_inner_common.Response-int64": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "inner_employee.CreateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -337,7 +396,7 @@ const docTemplate = `{
                 }
             }
         },
-        "employee.PageResponse": {
+        "inner_employee.PageResponse": {
             "type": "object",
             "properties": {
                 "page_number": {
@@ -352,7 +411,7 @@ const docTemplate = `{
                 }
             }
         },
-        "employee.Response": {
+        "inner_employee.Response": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -368,20 +427,13 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "idm_inner_common.Response-int64": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "integer"
-                },
-                "error": {
-                    "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
-                }
-            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

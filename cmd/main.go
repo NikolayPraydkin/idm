@@ -3,11 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/jmoiron/sqlx"
-	"go.uber.org/zap"
 	"idm/docs"
 	"idm/inner/common"
 	"idm/inner/server"
@@ -16,10 +11,19 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 // @title IDM API documentation
 // @BasePath /api/v1/
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	var srv, db = server.Build()
 	var cfg = common.GetConfig(".env")

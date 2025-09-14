@@ -2,11 +2,17 @@ package employee
 
 import (
 	"errors"
-	"github.com/gofiber/fiber/v2"
-	"go.uber.org/zap"
+
 	"idm/inner/common"
 	"idm/inner/web"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
+
+	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 type Controller struct {
@@ -36,17 +42,99 @@ func NewController(server *web.Server, employeeService Svc, logger *common.Logge
 	}
 }
 
+func requireRoles(roles ...string) fiber.Handler {
+	// нормализуем и фиксируем список обязательных ролей
+	req := make(map[string]struct{}, len(roles))
+	for _, r := range roles {
+		k := strings.ToUpper(strings.TrimSpace(r))
+		if k != "" {
+			req[k] = struct{}{}
+		}
+	}
+	return func(ctx *fiber.Ctx) error {
+		token, ok := ctx.Locals(web.JwtKey).(*jwt.Token)
+		if !ok || token == nil {
+			return common.ErrResponse(ctx, fiber.StatusUnauthorized, "unauthorized")
+		}
+		claims, ok := token.Claims.(*web.IdmClaims)
+		if !ok || claims == nil {
+			return common.ErrResponse(ctx, fiber.StatusUnauthorized, "unauthorized")
+		}
+		// сет ролей пользователя
+		user := make(map[string]struct{}, len(claims.RealmAccess.Roles))
+		for _, ur := range claims.RealmAccess.Roles {
+			k := strings.ToUpper(strings.TrimSpace(ur))
+			if k != "" {
+				user[k] = struct{}{}
+			}
+		}
+		// проверяем, что присутствуют ВСЕ обязательные роли
+		for k := range req {
+			if _, ok := user[k]; !ok {
+				return common.ErrResponse(ctx, fiber.StatusForbidden, "forbidden")
+			}
+		}
+		return ctx.Next()
+	}
+}
+func requireAnyRole(roles ...string) fiber.Handler {
+	// зафиксируем срез требуемых ролей
+	req := make([]string, len(roles))
+	copy(req, roles)
+
+	return func(ctx *fiber.Ctx) error {
+		token, ok := ctx.Locals(web.JwtKey).(*jwt.Token)
+		if !ok || token == nil {
+			return common.ErrResponse(ctx, fiber.StatusUnauthorized, "unauthorized")
+		}
+		claims, ok := token.Claims.(*web.IdmClaims)
+		if !ok || claims == nil {
+			return common.ErrResponse(ctx, fiber.StatusUnauthorized, "unauthorized")
+		}
+		if !hasAnyRole(claims.RealmAccess.Roles, req...) {
+			return common.ErrResponse(ctx, fiber.StatusForbidden, "forbidden")
+		}
+		return ctx.Next()
+	}
+}
+func hasAnyRole(userRoles []string, required ...string) bool {
+	if len(userRoles) == 0 || len(required) == 0 {
+		return false
+	}
+	// Нормализуем требуемые роли в set (UPPER + trim)
+	req := make(map[string]struct{}, len(required))
+	for _, r := range required {
+		k := strings.ToUpper(strings.TrimSpace(r))
+		if k != "" {
+			req[k] = struct{}{}
+		}
+	}
+	// Проверяем, есть ли среди ролей пользователя любая требуемая
+	for _, ur := range userRoles {
+		k := strings.ToUpper(strings.TrimSpace(ur))
+		if _, ok := req[k]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Controller) RegisterRoutes() {
 
-	c.server.GroupApiV1.Post("/employees", c.CreateEmployee)
-	c.server.GroupApiV1.Post("/employees/add", c.AddEmployee)
-	c.server.GroupApiV1.Post("/employees/save", c.SaveEmployee)
-	c.server.GroupApiV1.Get("/employees", c.GetAllEmployees)
-	c.server.GroupApiV1.Delete("/employees", c.DeleteEmployeesByIds)
-	c.server.GroupApiV1.Get("/employees/page", c.GetEmployeesPage)
-	c.server.GroupApiV1.Post("/employees/batch", c.GetEmployeesByIds)
-	c.server.GroupApiV1.Get("/employees/:id", c.GetEmployee)
-	c.server.GroupApiV1.Delete("/employees/:id", c.DeleteEmployeeById)
+	grp := c.server.GroupApiV1.Group("/employees")
+
+	// admin only
+	grp.Post("/", requireRoles(web.IdmAdmin), c.CreateEmployee)
+	grp.Post("/add", requireRoles(web.IdmAdmin), c.AddEmployee)
+	grp.Post("/save", requireRoles(web.IdmAdmin), c.SaveEmployee)
+	grp.Delete("/", requireRoles(web.IdmAdmin), c.DeleteEmployeesByIds)
+	grp.Delete("/:id", requireRoles(web.IdmAdmin), c.DeleteEmployeeById)
+
+	// read (admin OR user)
+	grp.Get("/", requireAnyRole(web.IdmAdmin, web.IdmUser), c.GetAllEmployees)
+	grp.Get("/page", requireAnyRole(web.IdmAdmin, web.IdmUser), c.GetEmployeesPage)
+	grp.Post("/batch", requireAnyRole(web.IdmAdmin, web.IdmUser), c.GetEmployeesByIds)
+	grp.Get("/:id", requireAnyRole(web.IdmAdmin, web.IdmUser), c.GetEmployee)
 }
 
 // Функция-хендлер, которая будет вызываться при POST запросе по маршруту "/api/v1/employees"
@@ -58,6 +146,7 @@ func (c *Controller) RegisterRoutes() {
 // @Param request body employee.CreateRequest true "create employee request"
 // @Success 200 {object} common.Response[int64]
 // @Router /employees [post]
+// @Security BearerAuth
 func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 
 	// анмаршалим JSON body запроса в структуру CreateRequest
@@ -104,6 +193,7 @@ func (c *Controller) CreateEmployee(ctx *fiber.Ctx) error {
 // @Success      200      {object}  map[string]string
 // @Router       /employees/add [post]
 // AddEmployee handles POST /api/v1/employees/add
+// @Security BearerAuth
 func (c *Controller) AddEmployee(ctx *fiber.Ctx) error {
 	var req CreateRequest
 	if err := ctx.BodyParser(&req); err != nil {
@@ -135,6 +225,7 @@ func (c *Controller) AddEmployee(ctx *fiber.Ctx) error {
 // @Success      200      {object}  map[string]int64
 // @Router       /employees/save [post]
 // SaveEmployee handles POST /api/v1/employees/save
+// @Security BearerAuth
 func (c *Controller) SaveEmployee(ctx *fiber.Ctx) error {
 	var req CreateRequest
 	if err := ctx.BodyParser(&req); err != nil {
@@ -166,6 +257,7 @@ func (c *Controller) SaveEmployee(ctx *fiber.Ctx) error {
 // @Success      200  {object}  employee.Response
 // @Router       /employees/{id} [get]
 // GetEmployee handles GET /api/v1/employees/:id
+// @Security BearerAuth
 func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
 	c.logger.Debug("Get employee", zap.String("id", idParam))
@@ -191,6 +283,7 @@ func (c *Controller) GetEmployee(ctx *fiber.Ctx) error {
 // @Success      200  {array}  employee.Response
 // @Router       /employees [get]
 // GetAllEmployees handles GET /api/v1/employees
+// @Security BearerAuth
 func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 	resps, err := c.employeeService.FindAll()
 	if err != nil {
@@ -208,6 +301,7 @@ func (c *Controller) GetAllEmployees(ctx *fiber.Ctx) error {
 // @Param        request  query     employee.PageRequest  true  "page request"
 // @Success      200      {object}  employee.PageResponse
 // @Router       /employees/page [get]
+// @Security BearerAuth
 func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 	var req PageRequest
 	if err := ctx.QueryParser(&req); err != nil {
@@ -233,6 +327,7 @@ func (c *Controller) GetEmployeesPage(ctx *fiber.Ctx) error {
 // @Success      200  {array}   employee.Response
 // @Router       /employees/batch [post]
 // GetEmployeesByIds handles POST /api/v1/employees/batch
+// @Security BearerAuth
 func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 	var ids []int64
 	if err := ctx.BodyParser(&ids); err != nil {
@@ -256,6 +351,7 @@ func (c *Controller) GetEmployeesByIds(ctx *fiber.Ctx) error {
 // @Success      200  {object}  map[string]string
 // @Router       /employees/{id} [delete]
 // DeleteEmployeeById handles DELETE /api/v1/employees/:id
+// @Security BearerAuth
 func (c *Controller) DeleteEmployeeById(ctx *fiber.Ctx) error {
 	idParam := ctx.Params("id")
 	c.logger.Debug("Delete employee", zap.String("id", idParam))
@@ -281,6 +377,7 @@ func (c *Controller) DeleteEmployeeById(ctx *fiber.Ctx) error {
 // @Success      200  {object}  map[string]string
 // @Router       /employees [delete]
 // DeleteEmployeesByIds handles DELETE /api/v1/employees
+// @Security BearerAuth
 func (c *Controller) DeleteEmployeesByIds(ctx *fiber.Ctx) error {
 	var ids []int64
 	if err := ctx.BodyParser(&ids); err != nil {
