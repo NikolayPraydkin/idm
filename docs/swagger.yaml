@@ -40,8 +40,9 @@ definitions:
         type: string
     type: object
 info:
-  contact: {}
+  contact: { }
   title: IDM API documentation
+  version: '1.0'
 paths:
   /employees:
     delete:

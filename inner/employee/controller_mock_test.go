@@ -601,16 +601,9 @@ func makeHS256Token(secret []byte, roles []string, withExp bool, expired bool) (
 	claims := web.IdmClaims{
 		RealmAccess: web.RealmAccessClaims{Roles: roles},
 	}
-	// если структура IdmClaims содержит RegisteredClaims, заполним exp
-	type expCapable interface {
-		GetExpirationTime() (*jwt.NumericDate, error)
-	}
+
 	// Пытаемся через рефлексию безопасно установить exp, если поле есть
 	if withExp {
-		// Попробуем привести к типу с рег-клеймами
-		type rc struct {
-			jwt.RegisteredClaims
-		}
 		// Устанавливаем exp на основе наличия RegisteredClaims внутри
 		switch v := any(&claims).(type) {
 		case *web.IdmClaims:
