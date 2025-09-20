@@ -1,16 +1,24 @@
 package web
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/swagger"
 	_ "idm/docs"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // структуа веб-сервера
 type Server struct {
-	App           *fiber.App
-	GroupApiV1    fiber.Router
+	App *fiber.App
+	// группа публичного API
+	GroupApi fiber.Router
+	// группа публичного API первой версии
+	GroupApiV1 fiber.Router
+	// группа непубличного API
 	GroupInternal fiber.Router
+}
+
+type AuthMiddlewareInterface interface {
+	ProtectWithJwt() func(*fiber.Ctx) error
 }
 
 // функция-конструктор
@@ -26,10 +34,10 @@ func NewServer() *Server {
 	groupApiV1 := groupApi.Group("/v1")
 
 	groupInternal := groupApi.Group("/internal")
-	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	return &Server{
 		App:           app,
+		GroupApi:      groupApi,
 		GroupApiV1:    groupApiV1,
 		GroupInternal: groupInternal,
 	}

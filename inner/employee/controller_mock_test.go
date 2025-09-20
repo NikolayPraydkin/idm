@@ -3,9 +3,6 @@ package employee
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gofiber/fiber/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"idm/inner/common"
 	"idm/inner/web"
 	"io"
@@ -13,6 +10,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // Объявляем структуру мока сервиса employee.Service
@@ -72,208 +75,302 @@ func (svc *MockService) GetEmployeesPage(req PageRequest) (PageResponse, error) 
 }
 
 func TestCreateEmployee(t *testing.T) {
-	var a = assert.New(t)
+	a := assert.New(t)
 
-	// тестируем положительный сценарий: работника создали и получили его id
-	t.Run("should return created employee id", func(t *testing.T) {
-		// Готовим тестовое окружение
-		server := web.NewServer()
-		var svc = new(MockService)
-		var logger = common.NewLogger(common.GetConfig(".env"))
-		var controller = NewController(server, svc, logger)
-		controller.RegisterRoutes()
-		// Готовим тестовое окружение
-		var body = strings.NewReader("{\"name\": \"john doe\"}")
-		var req = httptest.NewRequest(fiber.MethodPost, "/api/v1/employees", body)
-		req.Header.Set("Content-Type", "application/json")
+	tests := []struct {
+		name       string
+		body       string
+		mockSetup  func(*MockService)
+		wantStatus int
+		wantID     int64
+	}{
+		{
+			name: "should return created employee id",
+			body: `{"name": "john doe"}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("SaveWithTransaction", mock.AnythingOfType("*employee.Entity")).Return(int64(123), nil)
+			},
+			wantStatus: http.StatusOK,
+			wantID:     123,
+		},
+	}
 
-		// Настраиваем поведение мока в тесте
-		svc.On("SaveWithTransaction", mock.AnythingOfType("*employee.Entity")).Return(int64(123), nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// создаём тестовый токен аутентификации с ролью web.IdmAdmin
+			var claims = &web.IdmClaims{
+				RealmAccess: web.RealmAccessClaims{Roles: []string{web.IdmAdmin}},
+			}
+			// создаём stub middleware для аутентификации
+			var auth = func(c *fiber.Ctx) error {
+				c.Locals(web.JwtKey, &jwt.Token{Claims: claims})
+				return c.Next()
+			}
 
-		// Отправляем тестовый запрос на веб сервер
-		resp, err := server.App.Test(req)
+			server := web.NewServer()
+			server.GroupApiV1.Use(auth)
 
-		// Выполняем проверки полученных данных
-		a.Nil(err)
-		a.NotEmpty(resp)
-		a.Equal(http.StatusOK, resp.StatusCode)
-		bytesData, err := io.ReadAll(resp.Body)
-		a.Nil(err)
-		var responseBody common.Response[int64]
-		err = json.Unmarshal(bytesData, &responseBody)
-		a.Nil(err)
-		a.Equal(int64(123), responseBody.Data)
-		a.True(responseBody.Success)
-		a.Empty(responseBody.Message)
-	})
+			svc := new(MockService)
+			logger := common.NewLogger(common.GetConfig(".env"))
+			controller := NewController(server, svc, logger)
+			controller.RegisterRoutes()
+
+			if tt.mockSetup != nil {
+				tt.mockSetup(svc)
+			}
+
+			req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := server.App.Test(req)
+			a.Nil(err)
+			a.NotEmpty(resp)
+			a.Equal(tt.wantStatus, resp.StatusCode)
+
+			bytesData, err := io.ReadAll(resp.Body)
+			a.Nil(err)
+
+			var responseBody common.Response[int64]
+			err = json.Unmarshal(bytesData, &responseBody)
+			a.Nil(err)
+			a.Equal(tt.wantID, responseBody.Data)
+			a.True(responseBody.Success)
+			a.Empty(responseBody.Message)
+		})
+	}
 }
 
-// TestAddEmployee tests the AddEmployee handler
 func TestAddEmployee(t *testing.T) {
 	a := assert.New(t)
-	t.Run("should add employee successfully", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
 
-		body := strings.NewReader(`{"name":"alice"}`)
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", body)
-		req.Header.Set("Content-Type", "application/json")
+	tests := []struct {
+		name       string
+		body       string
+		mockSetup  func(*MockService)
+		wantStatus int
+	}{
+		{
+			name: "should add employee successfully",
+			body: `{"name":"alice"}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(nil)
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "should return bad request on validation error",
+			body: `{}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(common.RequestValidationError{Message: "Add emploee"})
+			},
+			wantStatus: fiber.StatusBadRequest,
+		},
+		{
+			name: "should return internal error on service failure",
+			body: `{"name":"alice"}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(errors.New("fail"))
+			},
+			wantStatus: fiber.StatusInternalServerError,
+		},
+	}
 
-		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// создаём тестовый токен аутентификации с ролью web.IdmAdmin
+			var claims = &web.IdmClaims{
+				RealmAccess: web.RealmAccessClaims{Roles: []string{web.IdmAdmin}},
+			}
+			// создаём stub middleware для аутентификации
+			var auth = func(c *fiber.Ctx) error {
+				c.Locals(web.JwtKey, &jwt.Token{Claims: claims})
+				return c.Next()
+			}
 
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(http.StatusOK, resp.StatusCode)
+			server := web.NewServer()
+			server.GroupApiV1.Use(auth)
 
-		data, _ := io.ReadAll(resp.Body)
-		var rb common.Response[map[string]string]
-		a.NoError(json.Unmarshal(data, &rb))
-		a.True(rb.Success)
-		a.Equal("added", rb.Data["message"])
-	})
+			svc := new(MockService)
+			controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
+			controller.RegisterRoutes()
 
-	t.Run("should return bad request on validation error", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
+			if tt.mockSetup != nil {
+				tt.mockSetup(svc)
+			}
 
-		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(common.RequestValidationError{Message: "Add emploee"})
+			req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
 
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", strings.NewReader(`{}`))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusBadRequest, resp.StatusCode)
-	})
+			resp, err := server.App.Test(req)
+			a.NoError(err)
+			a.Equal(tt.wantStatus, resp.StatusCode)
 
-	t.Run("should return internal error on service failure", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
-
-		body := strings.NewReader(`{"name":"alice"}`)
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/add", body)
-		req.Header.Set("Content-Type", "application/json")
-
-		svc.On("Add", mock.AnythingOfType("employee.CreateRequest")).Return(errors.New("fail"))
-
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusInternalServerError, resp.StatusCode)
-	})
+			// Для успешного кейса дополнительно проверим тело
+			if tt.wantStatus == http.StatusOK {
+				data, _ := io.ReadAll(resp.Body)
+				var rb common.Response[map[string]string]
+				a.NoError(json.Unmarshal(data, &rb))
+				a.True(rb.Success)
+				a.Equal("added", rb.Data["message"])
+			}
+		})
+	}
 }
 
-// TestSaveEmployee tests the SaveEmployee handler
 func TestSaveEmployee(t *testing.T) {
 	a := assert.New(t)
-	t.Run("should save employee and return id", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
 
-		body := strings.NewReader(`{"name":"bob"}`)
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", body)
-		req.Header.Set("Content-Type", "application/json")
+	tests := []struct {
+		name       string
+		body       string
+		mockSetup  func(*MockService)
+		wantStatus int
+		wantID     int64
+		checkBody  bool
+	}{
+		{
+			name: "should save employee and return id",
+			body: `{"name":"bob"}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(42), nil)
+			},
+			wantStatus: http.StatusOK,
+			wantID:     42,
+			checkBody:  true,
+		},
+		{
+			name: "should return bad request on validation error",
+			body: `{}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), common.RequestValidationError{Message: "Save employee"})
+			},
+			wantStatus: fiber.StatusBadRequest,
+		},
+		{
+			name: "should return internal error on service failure",
+			body: `{"name":"bob"}`,
+			mockSetup: func(svc *MockService) {
+				svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), errors.New("fail"))
+			},
+			wantStatus: fiber.StatusInternalServerError,
+		},
+	}
 
-		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(42), nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// создаём тестовый токен аутентификации с ролью web.IdmAdmin
+			var claims = &web.IdmClaims{
+				RealmAccess: web.RealmAccessClaims{Roles: []string{web.IdmAdmin}},
+			}
+			// создаём stub middleware для аутентификации
+			var auth = func(c *fiber.Ctx) error {
+				c.Locals(web.JwtKey, &jwt.Token{Claims: claims})
+				return c.Next()
+			}
 
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(http.StatusOK, resp.StatusCode)
+			server := web.NewServer()
+			server.GroupApiV1.Use(auth)
 
-		data, _ := io.ReadAll(resp.Body)
-		var rb common.Response[map[string]int64]
-		a.NoError(json.Unmarshal(data, &rb))
-		a.True(rb.Success)
-		a.Equal(int64(42), rb.Data["id"])
-	})
+			svc := new(MockService)
+			controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
+			controller.RegisterRoutes()
 
-	t.Run("should return bad request on validation error", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
+			if tt.mockSetup != nil {
+				tt.mockSetup(svc)
+			}
 
-		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), common.RequestValidationError{Message: "Save employee"})
+			req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
 
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", strings.NewReader(`{}`))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusBadRequest, resp.StatusCode)
-	})
+			resp, err := server.App.Test(req)
+			a.NoError(err)
+			a.Equal(tt.wantStatus, resp.StatusCode)
 
-	t.Run("should return internal error on service failure", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
-
-		body := strings.NewReader(`{"name":"bob"}`)
-		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees/save", body)
-		req.Header.Set("Content-Type", "application/json")
-
-		svc.On("Save", mock.AnythingOfType("employee.CreateRequest")).Return(int64(0), errors.New("fail"))
-
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusInternalServerError, resp.StatusCode)
-	})
+			if tt.checkBody {
+				data, _ := io.ReadAll(resp.Body)
+				var rb common.Response[map[string]int64]
+				a.NoError(json.Unmarshal(data, &rb))
+				a.True(rb.Success)
+				a.Equal(tt.wantID, rb.Data["id"])
+			}
+		})
+	}
 }
 
-// TestGetEmployee tests the GetEmployee handler
 func TestGetEmployee(t *testing.T) {
 	a := assert.New(t)
-	t.Run("should return employee", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
 
-		svc.On("FindById", int64(7)).Return(Response{Id: 7, Name: "E"}, nil)
+	tests := []struct {
+		name       string
+		url        string
+		mockSetup  func(*MockService)
+		wantStatus int
+		wantID     int64
+		checkBody  bool
+	}{
+		{
+			name: "should return employee",
+			url:  "/api/v1/employees/7",
+			mockSetup: func(svc *MockService) {
+				svc.On("FindById", int64(7)).Return(Response{Id: 7, Name: "E"}, nil)
+			},
+			wantStatus: http.StatusOK,
+			wantID:     7,
+			checkBody:  true,
+		},
+		{
+			name:       "should return bad request on invalid id",
+			url:        "/api/v1/employees/abc",
+			mockSetup:  nil,
+			wantStatus: fiber.StatusBadRequest,
+		},
+		{
+			name: "should return internal error on service failure",
+			url:  "/api/v1/employees/8",
+			mockSetup: func(svc *MockService) {
+				svc.On("FindById", int64(8)).Return(Response{}, errors.New("fail"))
+			},
+			wantStatus: fiber.StatusInternalServerError,
+		},
+	}
 
-		req := httptest.NewRequest(fiber.MethodGet, "/api/v1/employees/7", nil)
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(http.StatusOK, resp.StatusCode)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// создаём тестовый токен аутентификации с ролью web.IdmAdmin
+			var claims = &web.IdmClaims{
+				RealmAccess: web.RealmAccessClaims{Roles: []string{web.IdmAdmin}},
+			}
+			// создаём stub middleware для аутентификации
+			var auth = func(c *fiber.Ctx) error {
+				c.Locals(web.JwtKey, &jwt.Token{Claims: claims})
+				return c.Next()
+			}
 
-		data, _ := io.ReadAll(resp.Body)
-		var rb common.Response[Response]
-		a.NoError(json.Unmarshal(data, &rb))
-		a.True(rb.Success)
-		a.Equal(int64(7), rb.Data.Id)
-	})
+			server := web.NewServer()
+			server.GroupApiV1.Use(auth)
 
-	t.Run("should return bad request on invalid id", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
+			svc := new(MockService)
+			controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
+			controller.RegisterRoutes()
 
-		req := httptest.NewRequest(fiber.MethodGet, "/api/v1/employees/abc", nil)
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusBadRequest, resp.StatusCode)
-	})
+			if tt.mockSetup != nil {
+				tt.mockSetup(svc)
+			}
 
-	t.Run("should return internal error on service failure", func(t *testing.T) {
-		server := web.NewServer()
-		svc := new(MockService)
-		controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
-		controller.RegisterRoutes()
+			req := httptest.NewRequest(fiber.MethodGet, tt.url, nil)
+			resp, err := server.App.Test(req)
+			a.NoError(err)
+			a.Equal(tt.wantStatus, resp.StatusCode)
 
-		svc.On("FindById", int64(8)).Return(Response{}, errors.New("fail"))
-
-		req := httptest.NewRequest(fiber.MethodGet, "/api/v1/employees/8", nil)
-		resp, err := server.App.Test(req)
-		a.NoError(err)
-		a.Equal(fiber.StatusInternalServerError, resp.StatusCode)
-	})
+			if tt.checkBody {
+				data, _ := io.ReadAll(resp.Body)
+				var rb common.Response[Response]
+				a.NoError(json.Unmarshal(data, &rb))
+				a.True(rb.Success)
+				a.Equal(tt.wantID, rb.Data.Id)
+			}
+		})
+	}
 }
 
 func TestGetEmployeesPageValidation(t *testing.T) {
@@ -291,7 +388,19 @@ func TestGetEmployeesPageValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// создаём тестовый токен аутентификации с ролью web.IdmAdmin
+			var claims = &web.IdmClaims{
+				RealmAccess: web.RealmAccessClaims{Roles: []string{web.IdmAdmin}},
+			}
+			// создаём stub middleware для аутентификации
+			var auth = func(c *fiber.Ctx) error {
+				c.Locals(web.JwtKey, &jwt.Token{Claims: claims})
+				return c.Next()
+			}
+
 			server := web.NewServer()
+			server.GroupApiV1.Use(auth)
+
 			repo := new(MockRepo)
 			svc := newTestService(repo)
 			controller := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
@@ -303,4 +412,226 @@ func TestGetEmployeesPageValidation(t *testing.T) {
 			a.Equal(tt.statusCode, resp.StatusCode)
 		})
 	}
+}
+
+func TestAuthorization_AdminEndpoints(t *testing.T) {
+	a := assert.New(t)
+	secret := []byte("test-secret")
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		setupMocks     func(*MockService)
+		wantStatusCode int
+	}{
+		{
+			name:           "no token -> 401",
+			authHeader:     "",
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name:           "malformed token -> 401",
+			authHeader:     "Bearer i.am.not.a.jwt",
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "expired token -> 401",
+			authHeader: func() string {
+				s, _ := makeHS256Token(secret, []string{web.IdmAdmin}, true, true)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "bad signature -> 401",
+			authHeader: func() string {
+				// подпишем другим ключом
+				s, _ := makeHS256Token([]byte("wrong-secret"), []string{web.IdmAdmin}, true, false)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "valid token but missing role -> 403",
+			authHeader: func() string {
+				s, _ := makeHS256Token(secret, []string{web.IdmUser}, true, false)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := web.NewServer()
+			// Навешиваем тестовый JWT-мидлвар
+			server.GroupApiV1.Use(testJWTMiddleware(secret))
+
+			svc := new(MockService)
+			logger := common.NewLogger(common.GetConfig(".env"))
+			ctrl := NewController(server, svc, logger)
+			ctrl.RegisterRoutes()
+
+			if tt.setupMocks != nil {
+				tt.setupMocks(svc)
+			}
+
+			req := httptest.NewRequest(fiber.MethodPost, "/api/v1/employees", strings.NewReader(`{"name":"x"}`))
+			req.Header.Set("Content-Type", "application/json")
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+
+			resp, err := server.App.Test(req, -1)
+			a.NoError(err)
+			a.Equal(tt.wantStatusCode, resp.StatusCode)
+		})
+	}
+}
+
+func TestAuthorization_ReadEndpoints(t *testing.T) {
+	a := assert.New(t)
+	secret := []byte("test-secret")
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		setupMocks     func(*MockService)
+		wantStatusCode int
+	}{
+		{
+			name:           "no token -> 401",
+			authHeader:     "",
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name:           "malformed token -> 401",
+			authHeader:     "Bearer nope",
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "expired token -> 401",
+			authHeader: func() string {
+				s, _ := makeHS256Token(secret, []string{web.IdmUser}, true, true)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "bad signature -> 401",
+			authHeader: func() string {
+				s, _ := makeHS256Token([]byte("wrong-secret"), []string{web.IdmUser}, true, false)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name: "valid token but missing roles (empty) -> 403",
+			authHeader: func() string {
+				s, _ := makeHS256Token(secret, []string{}, true, false)
+				return "Bearer " + s
+			}(),
+			setupMocks:     nil,
+			wantStatusCode: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := web.NewServer()
+			server.GroupApiV1.Use(testJWTMiddleware(secret))
+
+			svc := new(MockService)
+			ctrl := NewController(server, svc, common.NewLogger(common.GetConfig(".env")))
+			ctrl.RegisterRoutes()
+
+			// мок для успешного чтения, он не должен вызываться при 401/403
+			svc.On("FindById", int64(7)).Return(Response{Id: 7, Name: "E"}, nil).Maybe()
+
+			req := httptest.NewRequest(fiber.MethodGet, "/api/v1/employees/7", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+
+			resp, err := server.App.Test(req, -1)
+			a.NoError(err)
+			a.Equal(tt.wantStatusCode, resp.StatusCode)
+		})
+	}
+}
+
+func testJWTMiddleware(secret []byte) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		auth := c.Get("Authorization")
+		if auth == "" || !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+			// не ставим locals — дальше requireRoles вернёт 401
+			return c.Next()
+		}
+		raw := strings.TrimSpace(auth[len("Bearer "):])
+
+		claims := &web.IdmClaims{}
+		// Валидация подписи и exp через стандартный парсер jwt/v5
+		tkn, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (interface{}, error) {
+			// принимаем только HS256 для тестов
+			if token.Method.Alg() != "HS256" {
+				return nil, errors.New("unexpected signing method")
+			}
+			return secret, nil
+		})
+		if err != nil || !tkn.Valid {
+			// токен невалидный — locals не ставим
+			return c.Next()
+		}
+		// токен валиден — кладём в Locals для requireRoles(...)
+		c.Locals(web.JwtKey, tkn)
+		return c.Next()
+	}
+}
+
+func makeHS256Token(secret []byte, roles []string, withExp bool, expired bool) (string, error) {
+	claims := web.IdmClaims{
+		RealmAccess: web.RealmAccessClaims{Roles: roles},
+	}
+
+	// Пытаемся через рефлексию безопасно установить exp, если поле есть
+	if withExp {
+		// Устанавливаем exp на основе наличия RegisteredClaims внутри
+		switch v := any(&claims).(type) {
+		case *web.IdmClaims:
+			// Пытаемся заполнить через встроенные поля, если есть
+			// (если RegisteredClaims отсутсвуют, просто игнорируем — токен будет без exp)
+			_ = v
+		}
+	}
+
+	now := time.Now()
+	var expiresAt *jwt.NumericDate
+	if withExp {
+		if expired {
+			expiresAt = jwt.NewNumericDate(now.Add(-1 * time.Hour))
+		} else {
+			expiresAt = jwt.NewNumericDate(now.Add(1 * time.Hour))
+		}
+	}
+
+	// Сконструируем map claims, чтобы гарантированно положить exp, не завися от структуры IdmClaims
+	m := jwt.MapClaims{
+		"realm_access": map[string]any{"roles": roles},
+		"iat":          now.Unix(),
+	}
+	if withExp && expiresAt != nil {
+		m["exp"] = expiresAt.Unix()
+	}
+
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, m)
+	return t.SignedString(secret)
 }

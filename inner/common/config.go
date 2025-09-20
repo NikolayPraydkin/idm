@@ -1,8 +1,9 @@
 package common
 
 import (
-	"github.com/joho/godotenv"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -14,6 +15,7 @@ type Config struct {
 	LogDevelopMode bool
 	SslSert        string `validate:"required"`
 	SslKey         string `validate:"required"`
+	KeycloakJwkUrl string `validate:"required"`
 }
 
 func GetConfig(envFile string) Config {
@@ -25,8 +27,9 @@ func GetConfig(envFile string) Config {
 		AppVersion:     os.Getenv("APP_VERSION"),
 		LogLevel:       os.Getenv("LOG_LEVEL"),
 		LogDevelopMode: os.Getenv("LOG_DEVELOP_MODE") == "true",
-		SslSert:        os.Getenv("SSL_SERT"),
+		SslSert:        os.Getenv("SSL_CERT"),
 		SslKey:         os.Getenv("SSL_KEY"),
+		KeycloakJwkUrl: os.Getenv("KEYCLOAK_JWK_URL"),
 	}
 	return cfg
 }
