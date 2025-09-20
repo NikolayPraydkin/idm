@@ -133,7 +133,7 @@ func TestService_Add(t *testing.T) {
 		repo := new(MockRepo)
 		svc := newTestService(repo)
 		req := CreateRequest{Name: ""}
-		err := svc.Add(nil, req)
+		err := svc.Add(context.TODO(), req)
 		assert.Error(t, err)
 		var valErr common.RequestValidationError
 		assert.True(t, errors.As(err, &valErr))
@@ -158,7 +158,7 @@ func TestService_Save(t *testing.T) {
 		repo := new(MockRepo)
 		svc := newTestService(repo)
 		req := CreateRequest{Name: ""}
-		id, err := svc.Save(nil, req)
+		id, err := svc.Save(context.TODO(), req)
 		assert.Error(t, err)
 		var valErr common.RequestValidationError
 		assert.True(t, errors.As(err, &valErr))
