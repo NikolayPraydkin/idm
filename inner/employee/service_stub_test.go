@@ -1,10 +1,11 @@
 package employee
 
 import (
-	"github.com/jmoiron/sqlx"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 )
 
 // stub-репозиторий, реализующий только FindAll
@@ -53,7 +54,7 @@ func (s *StubRepo) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) {
 func TestFindAll_WithStub(t *testing.T) {
 	svc := NewService(&StubRepo{})
 
-	resps, err := svc.FindAll()
+	resps, err := svc.FindAll(nil)
 	assert.NoError(t, err)
 	// Должны получить ровно две записи из stub
 	assert.Len(t, resps, 2)
