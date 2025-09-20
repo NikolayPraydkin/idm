@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"idm/inner/common"
@@ -103,7 +104,7 @@ func TestService_FindById(t *testing.T) {
 
 	// Успешный кейс
 	repo.On("FindById", int64(1)).Return(ent, nil)
-	got, err := svc.FindById(nil, 1)
+	got, err := svc.FindById(context.TODO(), 1)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, got)
 	repo.AssertCalled(t, "FindById", int64(1))
@@ -112,7 +113,7 @@ func TestService_FindById(t *testing.T) {
 	repo = new(MockRepo)
 	svc = newTestService(repo)
 	repo.On("FindById", int64(2)).Return((*Entity)(nil), errors.New("not found"))
-	_, err = svc.FindById(nil, 2)
+	_, err = svc.FindById(context.TODO(), 2)
 	assert.Error(t, err)
 	repo.AssertNumberOfCalls(t, "FindById", 1)
 }
@@ -123,7 +124,7 @@ func TestService_Add(t *testing.T) {
 	req := CreateRequest{Name: "Jane"}
 	repo.On("Add", req.ToEntity()).Return(nil)
 
-	err := svc.Add(nil, req)
+	err := svc.Add(context.TODO(), req)
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "Add", req.ToEntity())
 
@@ -147,7 +148,7 @@ func TestService_Save(t *testing.T) {
 	ent := CreateRequest{Name: "Bob"}
 	repo.On("Save", ent.ToEntity()).Return(int64(42), nil)
 
-	id, err := svc.Save(nil, ent)
+	id, err := svc.Save(context.TODO(), ent)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(42), id)
 	repo.AssertCalled(t, "Save", ent.ToEntity())
@@ -177,7 +178,7 @@ func TestService_FindAll(t *testing.T) {
 	}
 	repo.On("FindAll").Return(ents, nil)
 
-	got, err := svc.FindAll(nil)
+	got, err := svc.FindAll(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, got, 2)
 	assert.Equal(t, ents[0].toResponse(), got[0])
@@ -197,7 +198,7 @@ func TestService_FindByIds(t *testing.T) {
 	}
 	repo.On("FindByIds", ids).Return(ents, nil)
 
-	got, err := svc.FindByIds(nil, ids)
+	got, err := svc.FindByIds(context.TODO(), ids)
 	assert.NoError(t, err)
 	assert.Len(t, got, 2)
 	repo.AssertCalled(t, "FindByIds", ids)
@@ -208,7 +209,7 @@ func TestService_DeleteById(t *testing.T) {
 	svc := newTestService(repo)
 
 	repo.On("DeleteById", int64(5)).Return(nil)
-	err := svc.DeleteById(nil, 5)
+	err := svc.DeleteById(context.TODO(), 5)
 	assert.NoError(t, err)
 	repo.AssertNumberOfCalls(t, "DeleteById", 1)
 }
@@ -219,7 +220,7 @@ func TestService_DeleteByIds(t *testing.T) {
 
 	ids := []int64{7, 8}
 	repo.On("DeleteByIds", ids).Return(nil)
-	err := svc.DeleteByIds(nil, ids)
+	err := svc.DeleteByIds(context.TODO(), ids)
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "DeleteByIds", ids)
 }
@@ -323,7 +324,7 @@ func TestService_SaveWithTransaction(t *testing.T) {
 			}
 
 			tc.verify = func(t *testing.T) {
-				id, err := svc.SaveWithTransaction(nil, entity)
+				id, err := svc.SaveWithTransaction(context.TODO(), entity)
 				switch tc.name {
 				case "begin transaction error":
 					assert.Error(t, err)
