@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"idm/inner/common"
@@ -23,53 +24,53 @@ type MockService struct {
 	mock.Mock
 }
 
-func (svc *MockService) Add(req CreateRequest) error {
+func (svc *MockService) Add(ctx context.Context, req CreateRequest) error {
 	args := svc.Called(req)
 	return args.Error(0)
 }
 
-func (svc *MockService) Save(req CreateRequest) (int64, error) {
+func (svc *MockService) Save(ctx context.Context, req CreateRequest) (int64, error) {
 	args := svc.Called(req)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (svc *MockService) FindAll() ([]Response, error) {
+func (svc *MockService) FindAll(ctx context.Context) ([]Response, error) {
 	args := svc.Called()
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (svc *MockService) FindByIds(ids []int64) ([]Response, error) {
+func (svc *MockService) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
 	args := svc.Called(ids)
 	return args.Get(0).([]Response), args.Error(1)
 }
 
-func (svc *MockService) DeleteById(id int64) error {
+func (svc *MockService) DeleteById(ctx context.Context, id int64) error {
 	args := svc.Called(id)
 	return args.Error(0)
 }
 
-func (svc *MockService) DeleteByIds(ids []int64) error {
+func (svc *MockService) DeleteByIds(ctx context.Context, ids []int64) error {
 	args := svc.Called(ids)
 	return args.Error(0)
 }
 
-func (svc *MockService) SaveWithTransaction(e CreateRequest) (int64, error) {
+func (svc *MockService) SaveWithTransaction(ctx context.Context, e CreateRequest) (int64, error) {
 	args := svc.Called(e.ToEntity())
 	return args.Get(0).(int64), args.Error(1)
 }
 
 // Реализуем функции мок-сервиса
-func (svc *MockService) FindById(id int64) (Response, error) {
+func (svc *MockService) FindById(ctx context.Context, id int64) (Response, error) {
 	args := svc.Called(id)
 	return args.Get(0).(Response), args.Error(1)
 }
 
-func (svc *MockService) CreateEmployee(request CreateRequest) (int64, error) {
+func (svc *MockService) CreateEmployee(ctx context.Context, request CreateRequest) (int64, error) {
 	args := svc.Called(request)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (svc *MockService) GetEmployeesPage(req PageRequest) (PageResponse, error) {
+func (svc *MockService) GetEmployeesPage(ctx context.Context, req PageRequest) (PageResponse, error) {
 	args := svc.Called(req)
 	return args.Get(0).(PageResponse), args.Error(1)
 }
