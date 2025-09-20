@@ -1,8 +1,11 @@
 package common
 
 import (
+	"context"
+
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/fiber/v2/log"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -10,6 +13,42 @@ import (
 // Logger структура логгера
 type Logger struct {
 	*zap.Logger
+}
+
+// ключ для получения requestId из контекста
+var ridKey = requestid.ConfigDefault.ContextKey.(string)
+
+// функция логирования с добавлением requestId
+func (l *Logger) DebugCtx(
+	ctx context.Context,
+	msg string,
+	fields ...zap.Field,
+) {
+	// получаем requestId из контекста
+	var rid string
+	if v := ctx.Value(ridKey); v != nil {
+		rid = v.(string)
+	}
+	// добавляем для логирования поле с requestId
+	fields = append(fields, zap.String(ridKey, rid))
+	// вызываем метод логгера
+	l.Debug(msg, fields...)
+}
+
+func (l *Logger) ErrorCtx(
+	ctx context.Context,
+	msg string,
+	fields ...zap.Field,
+) {
+	// получаем requestId из контекста
+	var rid string
+	if v := ctx.Value(ridKey); v != nil {
+		rid = v.(string)
+	}
+	// добавляем для логирования поле с requestId
+	fields = append(fields, zap.String(ridKey, rid))
+	// вызываем метод логгера
+	l.Error(msg, fields...)
 }
 
 // NewLogger функция-конструктор логгера

@@ -1,10 +1,12 @@
 package employee
 
 import (
+	"context"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"idm/inner/common"
 	"idm/inner/validator"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // структура Service, которая будет инкапсулировать бизнес-логику
@@ -36,7 +38,7 @@ func NewService(repo Repo) *Service {
 }
 
 // бизнес-логика получения одного работника по id
-func (svc *Service) FindById(id int64) (Response, error) {
+func (svc *Service) FindById(ctx context.Context, id int64) (Response, error) {
 	employee, err := svc.repo.FindById(id)
 	if err != nil {
 		return Response{}, fmt.Errorf("error finding employee with id %d: %w", id, err)
@@ -45,7 +47,7 @@ func (svc *Service) FindById(id int64) (Response, error) {
 }
 
 // добавление работника без возврата id
-func (svc *Service) Add(req CreateRequest) error {
+func (svc *Service) Add(ctx context.Context, req CreateRequest) error {
 	if err := svc.validator.Validate(req); err != nil {
 		return common.RequestValidationError{Message: err.Error()}
 	}
@@ -53,7 +55,7 @@ func (svc *Service) Add(req CreateRequest) error {
 }
 
 // добавление с возвратом id
-func (svc *Service) Save(req CreateRequest) (int64, error) {
+func (svc *Service) Save(ctx context.Context, req CreateRequest) (int64, error) {
 	if err := svc.validator.Validate(req); err != nil {
 		return 0, common.RequestValidationError{Message: err.Error()}
 	}
@@ -61,7 +63,7 @@ func (svc *Service) Save(req CreateRequest) (int64, error) {
 }
 
 // получить всех работников
-func (svc *Service) FindAll() ([]Response, error) {
+func (svc *Service) FindAll(ctx context.Context) ([]Response, error) {
 	entities, err := svc.repo.FindAll()
 	if err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func (svc *Service) FindAll() ([]Response, error) {
 }
 
 // получить работников по слайсу id
-func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
+func (svc *Service) FindByIds(ctx context.Context, ids []int64) ([]Response, error) {
 	entities, err := svc.repo.FindByIds(ids)
 	if err != nil {
 		return nil, err
@@ -87,17 +89,17 @@ func (svc *Service) FindByIds(ids []int64) ([]Response, error) {
 }
 
 // удалить одного по id
-func (svc *Service) DeleteById(id int64) error {
+func (svc *Service) DeleteById(ctx context.Context, id int64) error {
 	return svc.repo.DeleteById(id)
 }
 
 // удалить всех по слайсу id
-func (svc *Service) DeleteByIds(ids []int64) error {
+func (svc *Service) DeleteByIds(ctx context.Context, ids []int64) error {
 	return svc.repo.DeleteByIds(ids)
 }
 
 // SaveWithTransaction проверяет дубликаты и создаёт запись в рамках одной транзакции.
-func (svc *Service) SaveWithTransaction(e CreateRequest) (int64, error) {
+func (svc *Service) SaveWithTransaction(ctx context.Context, e CreateRequest) (int64, error) {
 
 	if err := svc.validator.Validate(e); err != nil {
 		return 0, common.RequestValidationError{Message: err.Error()}
@@ -143,7 +145,7 @@ func (svc *Service) SaveWithTransaction(e CreateRequest) (int64, error) {
 	return newEmployeeId, err
 }
 
-func (svc *Service) GetEmployeesPage(req PageRequest) (PageResponse, error) {
+func (svc *Service) GetEmployeesPage(ctx context.Context, req PageRequest) (PageResponse, error) {
 	if err := svc.validator.Validate(req); err != nil {
 		return PageResponse{}, common.RequestValidationError{Message: err.Error()}
 	}
