@@ -1,6 +1,7 @@
 package employee
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -54,7 +55,7 @@ func (s *StubRepo) FindEmployeesPage(req PageRequest) ([]Entity, int64, error) {
 func TestFindAll_WithStub(t *testing.T) {
 	svc := NewService(&StubRepo{})
 
-	resps, err := svc.FindAll(nil)
+	resps, err := svc.FindAll(context.TODO())
 	assert.NoError(t, err)
 	// Должны получить ровно две записи из stub
 	assert.Len(t, resps, 2)
